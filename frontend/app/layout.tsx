@@ -8,25 +8,61 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="h-full">
-      <body className="h-full bg-[#0b1220] text-white">
+      <body className="h-full bg-[#0b1220] text-white overflow-x-hidden">
 
         {/* Navbar */}
-        <nav className="fixed top-0 w-full z-50 backdrop-blur-xl bg-[#0b1220]/60 border-b border-white/5">
-  <div className="max-w-7xl mx-auto px-8 py-4 flex justify-between items-center">
+        <nav className="fixed top-0 w-full z-50 backdrop-blur-xl bg-[#0b1220]/70 border-b border-white/5">
+          <div className="max-w-7xl mx-auto px-8 py-4 flex justify-between items-center">
 
-    <div className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-      AF
-    </div>
+            {/* Logo */}
+            <Link
+              href="/"
+              className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent hover:scale-105 transition"
+            >
+              AF
+            </Link>
 
-    <div className="flex gap-8 text-gray-300">
-      <a href="/" className="hover:text-white transition">Home</a>
-      <a href="/problems" className="hover:text-white transition">Problems</a>
-      <a href="/contests" className="hover:text-white transition">Contests</a>
-      <a href="/leaderboard" className="hover:text-white transition">Leaderboard</a>
-    </div>
+            {/* Navigation Links */}
+            <div className="flex items-center gap-8 text-gray-300">
 
-  </div>
-</nav>
+              <Link href="/" className="hover:text-white transition">
+                Home
+              </Link>
+
+              <Link href="/problems" className="hover:text-white transition">
+                Problems
+              </Link>
+
+              <Link href="/contests" className="hover:text-white transition">
+                Contests
+              </Link>
+
+              <Link href="/leaderboard" className="hover:text-white transition">
+                Leaderboard
+              </Link>
+
+              {/* Auth Buttons */}
+              <div className="flex items-center gap-4 ml-4">
+
+                <Link
+                  href="/auth/login"
+                  className="hover:text-white transition"
+                >
+                  Login
+                </Link>
+
+                <Link
+                  href="/auth/register"
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-90 transition font-medium shadow-lg shadow-purple-600/30"
+                >
+                  Sign Up
+                </Link>
+
+              </div>
+
+            </div>
+          </div>
+        </nav>
 
         {/* Page Content */}
         <div className="pt-24 min-h-screen">
