@@ -14,6 +14,8 @@ const nodeEnv = process.env.NODE_ENV || "development";
 module.exports = {
   nodeEnv,
   port: Number(process.env.PORT || 5000),
+  queueEnabled: (process.env.QUEUE_ENABLED || "false") === "true",
+  redisEnabled: (process.env.REDIS_ENABLED || "false") === "true",
   mongoUri: getRequired("MONGO_URI"),
   jwtAccessSecret: getRequired("JWT_ACCESS_SECRET"),
   jwtRefreshSecret: getRequired("JWT_REFRESH_SECRET"),
@@ -36,11 +38,15 @@ module.exports = {
   githubCallbackUrl:
     process.env.GITHUB_CALLBACK_URL ||
     "http://localhost:5000/api/auth/oauth/github/callback",
-  executionApiUrl: process.env.EXECUTION_API_URL,
+  executionEnabled: (process.env.EXECUTION_ENABLED || "true") === "true",
+  executionMode: process.env.EXECUTION_MODE || "local",
+  codeExecApi: process.env.CODE_EXEC_API || "http://localhost:2358",
+  executionApiUrl: process.env.EXECUTION_API_URL || process.env.CODE_EXEC_API,
   executionApiKey: process.env.EXECUTION_API_KEY,
   dockerNetworkDisabled: process.env.DOCKER_NETWORK_DISABLED !== "false",
   dockerCpuLimit: process.env.DOCKER_CPU_LIMIT || "0.5",
   dockerMemoryLimit: process.env.DOCKER_MEMORY_LIMIT || "256m",
   dockerExecutionTimeoutMs: Number(process.env.DOCKER_EXECUTION_TIMEOUT_MS || 5000),
+  localExecutionTimeoutMs: Number(process.env.LOCAL_EXECUTION_TIMEOUT_MS || 4000),
   redisUrl: process.env.REDIS_URL || "redis://127.0.0.1:6379",
 };

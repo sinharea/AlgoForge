@@ -1,7 +1,6 @@
 const mongoose = require("mongoose");
 const Contest = require("../models/Contest");
 const ContestSubmission = require("../models/ContestSubmission");
-const Submission = require("../models/Submission");
 const ApiError = require("../utils/apiError");
 const redis = require("../config/redis");
 
@@ -128,14 +127,10 @@ const registerContestParticipant = async (contestId, userId) => {
   return Contest.findById(contestId).populate("problems", "title slug difficulty");
 };
 
-const getContestSubmissionById = (submissionId) =>
-  Submission.findById(submissionId).populate("problem", "title slug");
-
 module.exports = {
   getContestState,
   ensureContestSubmissionAllowed,
   trackContestSubmission,
   buildLeaderboard,
   registerContestParticipant,
-  getContestSubmissionById,
 };

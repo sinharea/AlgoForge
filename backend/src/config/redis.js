@@ -1,6 +1,18 @@
 const Redis = require("ioredis");
+const { redisEnabled, redisUrl } = require("./env");
 
-const redisUrl = process.env.REDIS_URL || "redis://127.0.0.1:6379";
-const redis = new Redis(redisUrl, { maxRetriesPerRequest: null });
+let client = null;
 
-module.exports = redis;
+if (redisEnabled) {
+  client = new Redis(redisUrl, { maxRetriesPerRequest: null, lazyConnect: true });
+  client.on("error", () => {});
+}
+
+const noop = {
+  options: { host: "127.0.0.1", port: 6379 },
+  get: async () => null,
+  set: async () => "OK",
+  del: async () => 1,
+};
+
+module.exports = client || noop;

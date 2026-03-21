@@ -1,0 +1,59 @@
+AlgoForge Local Run / Validation Report
+
+Run commands:
+1) cd backend
+2) npm install
+3) npm run seed
+4) npm run dev
+5) Optional queue mode:
+   - set QUEUE_ENABLED=true
+   - set REDIS_ENABLED=true
+   - npm run worker
+
+Environment:
+- EXECUTION_ENABLED=true
+- EXECUTION_MODE=local
+- QUEUE_ENABLED=false
+- REDIS_ENABLED=false
+
+Cleanup + refactor:
+- Removed Docker-only app runtime files:
+  - backend/Dockerfile
+  - backend/Dockerfile.worker
+  - docker-compose.yml
+- Standardized config toggles in backend/src/config/env.js
+- Added safe local execution path with timeout in backend/src/services/executionService.js
+- Submission flow supports direct processing when queue disabled:
+  - backend/src/controllers/submissionController.js
+- Worker guarded by queue toggle:
+  - backend/src/queue/worker.js
+- Redis client made optional/no-op when REDIS_ENABLED=false:
+  - backend/src/config/redis.js
+- Removed dead code in contest service:
+  - backend/src/services/contestService.js
+
+Seed data:
+- Added seed script:
+  - backend/src/seed/seed.js
+- Added npm script:
+  - backend/package.json -> "seed": "node src/seed/seed.js"
+- Seed contains:
+  - 3 users
+  - 5 problems (Easy/Medium/Hard)
+  - sample submissions
+  - sample contest
+
+Env handling:
+- backend/.env and backend/.env.example updated for local run defaults
+- .gitignore updated for env files
+
+Validation status:
+- Runtime command execution in this environment is blocked (pwsh missing), so live command output cannot be captured here.
+- Static audit complete; local run path and scripts are wired.
+
+Manual flow to validate locally:
+1) Signup: POST /api/auth/register
+2) Login: POST /api/auth/login
+3) Fetch problems: GET /api/problems
+4) Submit code: POST /api/submissions
+5) Check submission: GET /api/submissions/:id

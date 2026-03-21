@@ -14,8 +14,11 @@ out/
 
 # Environment variables
 .env
+.env.*
 .env.local
 .env*.local
+backend/.env
+frontend/.env
 
 # IDE
 .vscode/
