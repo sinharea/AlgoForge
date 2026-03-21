@@ -1,35 +1,39 @@
 const mongoose = require("mongoose");
+const { DIFFICULTY } = require("../constants");
 
 const problemSchema = new mongoose.Schema({
   title: {
     type: String,
-    required: true
+    required: true,
+    trim: true,
   },
   slug: {
     type: String,
     required: true,
-    unique: true
+    unique: true,
+    index: true,
   },
   difficulty: {
     type: String,
-    enum: ["Easy", "Medium", "Hard"],
-    required: true
+    enum: Object.values(DIFFICULTY),
+    required: true,
+    index: true,
   },
   description: {
     type: String,
-    required: true
+    required: true,
   },
   constraints: String,
-  tags: [String],
+  tags: [{ type: String, index: true }],
 
-  sampleTestCases: [
+  testCases: [
     {
       input: String,
       expectedOutput: String
     }
   ],
 
-  hiddenTestCases: [
+  sampleTestCases: [
     {
       input: String,
       expectedOutput: String
@@ -47,5 +51,7 @@ const problemSchema = new mongoose.Schema({
   }
 
 }, { timestamps: true });
+
+problemSchema.index({ title: "text", description: "text", tags: "text" });
 
 module.exports = mongoose.model("Problem", problemSchema);

@@ -1,44 +1,67 @@
 const Problem = require("../models/Problem");
+const asyncHandler = require("../utils/asyncHandler");
+const ApiError = require("../utils/apiError");
+const { createProblem, updateProblem } = require("../services/problemService");
 
-/*
-  GET ALL PROBLEMS
-  Used for Problems List page
-  Only send minimal required fields
-*/
-exports.getAllProblems = async (req, res) => {
-  try {
-    const problems = await Problem.find().select(
-      "title slug difficulty"
-    );
+const getAllProblems = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 20, difficulty, tags, search } = req.query;
+  const filter = {};
 
-    res.json(problems);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error" });
-  }
-};
+  if (difficulty) filter.difficulty = difficulty;
+  if (tags) filter.tags = { $in: String(tags).split(",").map((v) => v.trim()) };
+  if (search) filter.$text = { $search: search };
 
+  const [items, total] = await Promise.all([
+    Problem.find(filter)
+      .select("title slug difficulty tags")
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .sort({ createdAt: -1 }),
+    Problem.countDocuments(filter),
+  ]);
 
-/*
-  GET SINGLE PROBLEM
-  Used for Problem Detail page
-  IMPORTANT:
-  - Send sampleTestCases
-  - DO NOT send hiddenTestCases
-*/
-exports.getProblemById = async (req, res) => {
-  try {
-    const problem = await Problem.findById(req.params.id).select(
-      "title slug description difficulty constraints tags sampleTestCases timeLimit memoryLimit"
-    );
+  res.json({
+    items,
+    page,
+    limit,
+    total,
+    pages: Math.ceil(total / limit),
+  });
+});
 
-    if (!problem) {
-      return res.status(404).json({ message: "Problem not found" });
-    }
+const getProblemById = asyncHandler(async (req, res) => {
+  const problem = await Problem.findById(req.params.id).select("-testCases");
+  if (!problem) throw new ApiError(404, "Problem not found");
+  res.json(problem);
+});
 
-    res.json(problem);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error" });
-  }
+const getProblemBySlug = asyncHandler(async (req, res) => {
+  const problem = await Problem.findOne({ slug: req.params.slug }).select("-testCases");
+  if (!problem) throw new ApiError(404, "Problem not found");
+  res.json(problem);
+});
+
+const createProblemHandler = asyncHandler(async (req, res) => {
+  const problem = await createProblem(req.body);
+  res.status(201).json(problem);
+});
+
+const updateProblemHandler = asyncHandler(async (req, res) => {
+  const problem = await updateProblem(req.params.id, req.body);
+  res.json(problem);
+});
+
+const deleteProblem = asyncHandler(async (req, res) => {
+  const deleted = await Problem.findByIdAndDelete(req.params.id);
+  if (!deleted) throw new ApiError(404, "Problem not found");
+  res.json({ message: "Problem deleted successfully" });
+});
+
+module.exports = {
+  getAllProblems,
+  getProblemById,
+  getProblemBySlug,
+  createProblem: createProblemHandler,
+  updateProblem: updateProblemHandler,
+  deleteProblem,
 };

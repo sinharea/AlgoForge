@@ -1,105 +1,55 @@
-const User = require("../models/User");
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
+const asyncHandler = require("../utils/asyncHandler");
+const {
+  registerUser,
+  loginUser,
+  refreshSession,
+  logoutSession,
+  requestPasswordReset,
+  resetPassword,
+  verifyEmail,
+} = require("../services/authService");
 
-/*
-========================
-REGISTER CONTROLLER
-========================
-*/
-exports.register = async (req, res) => {
-  try {
-    console.log("Register route hit");
-    console.log("Body:", req.body);
+const register = asyncHandler(async (req, res) => {
+  const data = await registerUser(req.body);
+  res.status(201).json(data);
+});
 
-    const { username, email, password } = req.body;
+const login = asyncHandler(async (req, res) => {
+  const data = await loginUser(req.body);
+  res.json(data);
+});
 
-    if (!username || !email || !password) {
-      return res.status(400).json({
-        message: "All fields are required"
-      });
-    }
+const refresh = asyncHandler(async (req, res) => {
+  const data = await refreshSession(req.body);
+  res.json(data);
+});
 
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({
-        message: "User already exists"
-      });
-    }
+const logout = asyncHandler(async (req, res) => {
+  await logoutSession({ userId: req.user._id });
+  res.json({ message: "Logged out" });
+});
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+const forgotPassword = asyncHandler(async (req, res) => {
+  await requestPasswordReset(req.body);
+  res.json({ message: "If that email exists, reset instructions were sent." });
+});
 
-    const newUser = await User.create({
-      username,
-      email,
-      password: hashedPassword
-    });
+const resetPasswordHandler = asyncHandler(async (req, res) => {
+  await resetPassword(req.body);
+  res.json({ message: "Password reset successful" });
+});
 
-    console.log("User created:", newUser._id);
+const verifyEmailHandler = asyncHandler(async (req, res) => {
+  await verifyEmail(req.body);
+  res.json({ message: "Email verified successfully" });
+});
 
-    res.status(201).json({
-      message: "User registered successfully"
-    });
-
-  } catch (err) {
-    console.error("Register Error:", err);
-    res.status(500).json({
-      message: "Server error"
-    });
-  }
-};
-
-/*
-========================
-LOGIN CONTROLLER
-========================
-*/
-exports.login = async (req, res) => {
-  try {
-    console.log("Login route hit");
-    console.log("Body:", req.body);
-
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({
-        message: "Email and password required"
-      });
-    }
-
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(400).json({
-        message: "Invalid credentials"
-      });
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({
-        message: "Invalid credentials"
-      });
-    }
-
-    const token = jwt.sign(
-      { id: user._id },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
-
-    res.json({
-      token,
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email
-      }
-    });
-
-  } catch (err) {
-    console.error("Login Error:", err);
-    res.status(500).json({
-      message: "Server error"
-    });
-  }
+module.exports = {
+  register,
+  login,
+  refresh,
+  logout,
+  forgotPassword,
+  resetPassword: resetPasswordHandler,
+  verifyEmail: verifyEmailHandler,
 };
