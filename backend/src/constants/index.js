@@ -29,10 +29,17 @@ const DIFFICULTY = {
   HARD: "Hard",
 };
 
+const CONTEST_STATUS = {
+  UPCOMING: "upcoming",
+  RUNNING: "running",
+  ENDED: "ended",
+};
+
 module.exports = {
   USER_ROLES,
   AUTH_PROVIDER,
   SUBMISSION_STATUS,
   VERDICTS,
   DIFFICULTY,
+  CONTEST_STATUS,
 };

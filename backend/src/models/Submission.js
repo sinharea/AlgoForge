@@ -21,6 +21,11 @@ const submissionSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  contest: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Contest",
+    index: true,
+  },
   result: {
     stdout: String,
     stderr: String,

@@ -38,4 +38,9 @@ module.exports = {
     "http://localhost:5000/api/auth/oauth/github/callback",
   executionApiUrl: process.env.EXECUTION_API_URL,
   executionApiKey: process.env.EXECUTION_API_KEY,
+  dockerNetworkDisabled: process.env.DOCKER_NETWORK_DISABLED !== "false",
+  dockerCpuLimit: process.env.DOCKER_CPU_LIMIT || "0.5",
+  dockerMemoryLimit: process.env.DOCKER_MEMORY_LIMIT || "256m",
+  dockerExecutionTimeoutMs: Number(process.env.DOCKER_EXECUTION_TIMEOUT_MS || 5000),
+  redisUrl: process.env.REDIS_URL || "redis://127.0.0.1:6379",
 };

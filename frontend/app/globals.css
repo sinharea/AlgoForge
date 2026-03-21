@@ -1,88 +1,11 @@
 @import "tailwindcss";
 
-html, body {
-  height: 100%;
+* {
+  box-sizing: border-box;
 }
 
+html,
 body {
-  @apply bg-black text-white;
-}
-
-
-@keyframes floatSlow {
-  0% { transform: translateY(0px) translateX(0px); }
-  50% { transform: translateY(-40px) translateX(30px); }
-  100% { transform: translateY(0px) translateX(0px); }
-}
-
-@keyframes floatReverse {
-  0% { transform: translateY(0px) translateX(0px); }
-  50% { transform: translateY(30px) translateX(-30px); }
-  100% { transform: translateY(0px) translateX(0px); }
-}
-
-@keyframes gradientShift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
-@keyframes fadeUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0px);
-  }
-}
-
-.animate-fadeUp {
-  animation: fadeUp 0.8s ease forwards;
-}
-
-@keyframes gradientMove {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
-.animate-gradient {
-  animation: gradientMove 15s ease infinite;
-}
-
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(30px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.animate-fadeUp {
-  animation: fadeUp 0.8s ease-out;
-}
-
-@keyframes gradientMove {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
-.animate-gradient {
-  background-size: 200% 200%;
-  animation: gradientMove 10s ease infinite;
-}
-
-@keyframes fadeUp {
-  from {
-    opacity: 0;
-    transform: translateY(40px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-fadeUp {
-  animation: fadeUp 0.8s ease forwards;
+  margin: 0;
+  padding: 0;
 }

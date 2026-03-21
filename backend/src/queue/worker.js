@@ -1,75 +1,100 @@
+const mongoose = require("mongoose");
 const submissionQueue = require("./submissionQueue");
 const Submission = require("../models/Submission");
+const Problem = require("../models/Problem");
+const connectDb = require("../config/db");
 const { SUBMISSION_STATUS } = require("../constants");
 const { judgeSubmission } = require("../services/executionService");
-const mongoose = require("mongoose");
-require("dotenv").config();
+const { updateUserTopicAnalytics } = require("../services/analyticsService");
+const { trackContestSubmission } = require("../services/contestService");
+const logger = require("../utils/logger");
 
-console.log("Worker starting...");
+const startWorker = async () => {
+  await connectDb();
+  logger.info("Worker connected to MongoDB");
 
-// Mongo connection
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("Worker MongoDB Connected"))
-  .catch(err => console.error("Worker DB Error:", err));
+  submissionQueue.process(5, async (job) => {
+    const { submissionId } = job.data;
+    const submission = await Submission.findById(submissionId);
+    if (!submission) return;
 
-// Queue connection debug
-submissionQueue.on("ready", () => {
-  console.log("Queue is ready and connected to Redis");
-});
-
-submissionQueue.on("error", (err) => {
-  console.error("Queue error:", err);
-});
-
-submissionQueue.process(async (job) => {
-
-  console.log("Job received from queue");
-
-  const { submissionId } = job.data;
-  console.log("Processing submission:", submissionId);
-
-  const submission = await Submission.findById(submissionId).populate("problem");
-
-  if (!submission) {
-    console.log("Submission not found");
-    return;
-  }
-
-  const problem = submission.problem;
-
-  if (!problem || !problem.testCases?.length) {
-    await Submission.findByIdAndUpdate(submissionId, {
-      status: SUBMISSION_STATUS.FAILED,
-      verdict: "Runtime Error",
-      result: {
+    const problem = await Problem.findById(submission.problem).select("testCases tags");
+    if (!problem || !problem.testCases?.length) {
+      submission.status = SUBMISSION_STATUS.FAILED;
+      submission.verdict = "Runtime Error";
+      submission.result = {
         stdout: "",
-        stderr: "Problem does not contain test cases",
+        stderr: "Problem test cases missing",
         compileOutput: "",
         passedCount: 0,
         totalCount: 0,
-      },
-    });
-    console.log("No test cases found");
-    return;
-  }
-  const judged = await judgeSubmission({
-    language: submission.language,
-    code: submission.code,
-    testCases: problem.testCases,
+      };
+      await submission.save();
+      return;
+    }
+
+    try {
+      const judged = await judgeSubmission({
+        language: submission.language,
+        code: submission.code,
+        testCases: problem.testCases,
+      });
+
+      submission.status = SUBMISSION_STATUS.COMPLETED;
+      submission.verdict = judged.verdict;
+      submission.runtime = judged.runtime;
+      submission.result = {
+        stdout: judged.stdout,
+        stderr: judged.stderr,
+        compileOutput: judged.compileOutput,
+        passedCount: judged.passedCount,
+        totalCount: judged.totalCount,
+      };
+      await submission.save();
+
+      await updateUserTopicAnalytics({
+        userId: submission.user,
+        tags: problem.tags,
+        solved: judged.verdict === "Accepted",
+        runtime: judged.runtime,
+      });
+
+      if (submission.contest) {
+        await trackContestSubmission({
+          contestId: submission.contest,
+          userId: submission.user,
+          problemId: submission.problem,
+          submissionId: submission._id,
+          verdict: judged.verdict,
+          runtime: judged.runtime,
+        });
+      }
+    } catch (error) {
+      submission.status = SUBMISSION_STATUS.FAILED;
+      submission.verdict = "Runtime Error";
+      submission.result = {
+        stdout: "",
+        stderr: error.message,
+        compileOutput: "",
+        passedCount: 0,
+        totalCount: problem.testCases.length,
+      };
+      await submission.save();
+      throw error;
+    }
   });
 
-  await Submission.findByIdAndUpdate(submissionId, {
-    status: SUBMISSION_STATUS.COMPLETED,
-    verdict: judged.verdict,
-    runtime: judged.runtime,
-    result: {
-      stdout: judged.stdout,
-      stderr: judged.stderr,
-      compileOutput: judged.compileOutput,
-      passedCount: judged.passedCount,
-      totalCount: judged.totalCount,
-    },
+  submissionQueue.on("completed", (job) => {
+    logger.info("Submission job completed", { id: job.id });
   });
 
-  console.log("Submission evaluated:", judged.verdict);
+  submissionQueue.on("failed", (job, err) => {
+    logger.error("Submission job failed", { id: job?.id, error: err.message });
+  });
+};
+
+startWorker().catch((err) => {
+  logger.error("Worker startup failed", { error: err.message });
+  mongoose.disconnect();
+  process.exit(1);
 });

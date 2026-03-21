@@ -1,82 +1,25 @@
 import "./globals.css";
 import Link from "next/link";
+import Providers from "./providers";
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="h-full">
-      <body className="h-full bg-[#0b1220] text-white overflow-x-hidden">
-
-        {/* Navbar */}
-        <nav className="fixed top-0 w-full z-50 backdrop-blur-xl bg-[#0b1220]/70 border-b border-white/5">
-          <div className="max-w-7xl mx-auto px-8 py-4 flex justify-between items-center">
-
-            {/* Logo */}
-            <Link
-              href="/"
-              className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent hover:scale-105 transition"
-            >
-              AF
-            </Link>
-
-            {/* Navigation Links */}
-            <div className="flex items-center gap-8 text-gray-300">
-
-              <Link href="/" className="hover:text-white transition">
-                Home
-              </Link>
-
-              <Link href="/problems" className="hover:text-white transition">
-                Problems
-              </Link>
-
-              <Link href="/contests" className="hover:text-white transition">
-                Contests
-              </Link>
-
-              <Link href="/leaderboard" className="hover:text-white transition">
-                Leaderboard
-              </Link>
-
-              {/* Auth Buttons */}
-              <div className="flex items-center gap-4 ml-4">
-
-                <Link
-                  href="/auth/login"
-                  className="hover:text-white transition"
-                >
-                  Login
-                </Link>
-
-                <Link
-                  href="/auth/register"
-                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-90 transition font-medium shadow-lg shadow-purple-600/30"
-                >
-                  Sign Up
-                </Link>
-
-              </div>
-
+    <html lang="en">
+      <body className="min-h-screen bg-slate-950 text-slate-100">
+        <Providers>
+          <header className="border-b border-slate-800 bg-slate-900/70 backdrop-blur">
+            <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+              <Link href="/" className="text-xl font-bold text-violet-400">AlgoForge</Link>
+              <nav className="flex items-center gap-6 text-sm">
+                <Link href="/problems">Problems</Link>
+                <Link href="/dashboard">Dashboard</Link>
+                <Link href="/contests">Contests</Link>
+                <Link href="/auth/login">Login</Link>
+              </nav>
             </div>
-          </div>
-        </nav>
-
-        {/* Page Content */}
-        <div className="pt-24 min-h-screen">
-          {children}
-        </div>
-
-        {/* Footer Branding */}
-        <div className="fixed bottom-6 right-8 text-right text-gray-400 text-sm leading-tight">
-          <div>Built by</div>
-          <div className="font-semibold text-blue-400 text-lg">
-            Rea Sinha
-          </div>
-        </div>
-
+          </header>
+          <main className="mx-auto w-full max-w-7xl px-6 py-8">{children}</main>
+        </Providers>
       </body>
     </html>
   );
