@@ -23,12 +23,20 @@ const dockerSpec = {
   python: { image: "python:3.12-alpine", file: "main.py", args: ["python3", "main.py"] },
   javascript: { image: "node:20-alpine", file: "main.js", args: ["node", "main.js"] },
   cpp: { image: "gcc:13", file: "main.cpp", args: ["sh", "-lc", "g++ main.cpp -O2 -o main && ./main"] },
+  java: { image: "openjdk:17-alpine", file: "Main.java", args: ["sh", "-c", "javac Main.java && java Main"] },
+  go: { image: "golang:1.21-alpine", file: "main.go", args: ["go", "run", "main.go"] },
+  rust: { image: "rust:1.74-alpine", file: "main.rs", args: ["sh", "-c", "rustc main.rs -o main && ./main"] },
+  typescript: { image: "node:20-alpine", file: "main.ts", args: ["sh", "-c", "npx -y ts-node main.ts"] },
 };
 
 const localSpec = {
   python: { cmd: "python", file: "main.py", args: ["main.py"] },
   javascript: { cmd: "node", file: "main.js", args: ["main.js"] },
   cpp: { cmd: "g++", file: "main.cpp", compileArgs: ["main.cpp", "-O2", "-o", "main.exe"], runCmd: ".\\main.exe" },
+  java: { cmd: "javac", file: "Main.java", compileArgs: ["Main.java"], runCmd: "java", runArgs: ["Main"] },
+  go: { cmd: "go", file: "main.go", args: ["run", "main.go"] },
+  rust: { cmd: "rustc", file: "main.rs", compileArgs: ["main.rs", "-o", "main.exe"], runCmd: ".\\main.exe" },
+  typescript: { cmd: "npx", file: "main.ts", args: ["-y", "ts-node", "main.ts"] },
 };
 
 const normalize = (v = "") =>
@@ -84,8 +92,22 @@ const runLocal = async ({ language, code, stdin = "" }) => {
     fs.writeFileSync(path.join(tempDir, spec.file), code, "utf8");
     const start = Date.now();
 
-    if (language === "cpp") {
+    // Handle compiled languages: cpp, java, rust
+    if (spec.compileArgs) {
       await execFileAsync(spec.cmd, spec.compileArgs, { cwd: tempDir, timeout: localExecutionTimeoutMs });
+
+      // Java needs special handling (java Main instead of ./main.exe)
+      if (language === "java") {
+        const run = await execFileAsync(spec.runCmd, spec.runArgs, {
+          cwd: tempDir,
+          timeout: localExecutionTimeoutMs,
+          input: stdin,
+          maxBuffer: 1024 * 1024,
+        });
+        return { stdout: run.stdout || "", stderr: run.stderr || "", executionTime: Date.now() - start };
+      }
+
+      // C++ and Rust use cmd /c to run the executable
       const run = await execFileAsync("cmd", ["/c", spec.runCmd], {
         cwd: tempDir,
         timeout: localExecutionTimeoutMs,
@@ -95,6 +117,7 @@ const runLocal = async ({ language, code, stdin = "" }) => {
       return { stdout: run.stdout || "", stderr: run.stderr || "", executionTime: Date.now() - start };
     }
 
+    // Interpreted languages: python, javascript, go, typescript
     const result = await execFileAsync(spec.cmd, spec.args, {
       cwd: tempDir,
       timeout: localExecutionTimeoutMs,
@@ -167,4 +190,4 @@ const judgeSubmission = async ({ language, code, testCases = [] }) => {
   };
 };
 
-module.exports = { execute, judgeSubmission, runDocker, runLocal, runApi };
+module.exports = { execute, judgeSubmission, runDocker, runLocal, runApi, normalize };

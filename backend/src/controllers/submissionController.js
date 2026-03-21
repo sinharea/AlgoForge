@@ -6,7 +6,7 @@ const submissionQueue = require("../queue/submissionQueue");
 const { SUBMISSION_STATUS } = require("../constants");
 const { queueEnabled } = require("../config/env");
 const { ensureContestSubmissionAllowed, trackContestSubmission } = require("../services/contestService");
-const { judgeSubmission } = require("../services/executionService");
+const { judgeSubmission, execute, normalize } = require("../services/executionService");
 const { updateUserTopicAnalytics } = require("../services/analyticsService");
 
 const processSubmissionNow = async (submission) => {
@@ -131,9 +131,37 @@ const getMySubmissions = asyncHandler(async (req, res) => {
   res.json(submissions);
 });
 
+const runCode = asyncHandler(async (req, res) => {
+  const { language, code, testCases } = req.body;
+
+  const results = [];
+  for (const tc of testCases) {
+    const result = await execute({ language, code, stdin: tc.input || "" });
+    const actualOutput = result.stdout || "";
+    const passed = tc.expectedOutput !== undefined
+      ? normalize(actualOutput) === normalize(tc.expectedOutput)
+      : null;
+
+    results.push({
+      input: tc.input,
+      expectedOutput: tc.expectedOutput,
+      actualOutput,
+      stderr: result.stderr || "",
+      passed,
+      runtime: result.executionTime,
+    });
+
+    // If there's a runtime error, stop running remaining test cases
+    if (result.stderr) break;
+  }
+
+  res.json({ results });
+});
+
 module.exports = {
   createSubmission,
   getSubmissionById,
   getMySubmissions,
   processSubmissionNow,
+  runCode,
 };

@@ -2,11 +2,11 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import toast from "react-hot-toast";
 import { clsx } from "clsx";
 import { Clock, Tag, Copy, Check, BookOpen, FileCode, TestTube } from "lucide-react";
-import { problemApi } from "@/src/api/problemApi";
+import { problemApi, RunResult } from "@/src/api/problemApi";
 import CodePlayground from "@/src/features/editor/CodePlayground";
 import { EditorSkeleton } from "@/src/components/ui/Skeleton";
 import ErrorState from "@/src/components/ui/ErrorState";
@@ -17,7 +17,13 @@ const templates: Record<string, string> = {
   cpp: "#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    \n    return 0;\n}",
   python: "def solve():\n    pass\n\nif __name__ == '__main__':\n    solve()",
   javascript: "function solve() {\n    \n}\n\nsolve();",
+  java: "import java.util.*;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner sc = new Scanner(System.in);\n        \n    }\n}",
+  go: "package main\n\nimport \"fmt\"\n\nfunc main() {\n    \n}",
+  rust: "use std::io::{self, BufRead};\n\nfn main() {\n    \n}",
+  typescript: "function solve(): void {\n    \n}\n\nsolve();",
 };
+
+const getStorageKey = (slug: string, language: string) => `algoforge_code_${slug}_${language}`;
 
 export default function ProblemDetailPage() {
   useProtectedRoute();
@@ -27,6 +33,41 @@ export default function ProblemDetailPage() {
   const [submissionId, setSubmissionId] = useState<string | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<"description" | "submissions">("description");
+  const [activeTestTab, setActiveTestTab] = useState<"samples" | "custom">("samples");
+  const [customInput, setCustomInput] = useState("");
+  const [runResults, setRunResults] = useState<RunResult[]>([]);
+
+  // Load saved code from localStorage on mount and when slug/language changes
+  useEffect(() => {
+    if (!slug) return;
+    const savedCode = localStorage.getItem(getStorageKey(slug, language));
+    if (savedCode) {
+      setCode(savedCode);
+    } else {
+      setCode(templates[language] || "");
+    }
+  }, [slug, language]);
+
+  // Save code to localStorage whenever it changes
+  const handleCodeChange = useCallback(
+    (newCode: string) => {
+      setCode(newCode);
+      if (slug) {
+        localStorage.setItem(getStorageKey(slug, language), newCode);
+      }
+    },
+    [slug, language]
+  );
+
+  // Handle language change
+  const handleLanguageChange = useCallback(
+    (newLanguage: string) => {
+      setLanguage(newLanguage);
+      // Clear run results when changing language
+      setRunResults([]);
+    },
+    []
+  );
 
   const problemQuery = useQuery({
     queryKey: ["problem", slug],
@@ -45,10 +86,43 @@ export default function ProblemDetailPage() {
       ).data,
     onSuccess: (data) => {
       setSubmissionId(data.submissionId || data.submission?._id);
+      setRunResults([]); // Clear run results when submitting
       toast.success("Submission queued");
     },
     onError: (error: any) => {
       toast.error(error?.response?.data?.message || "Submit failed");
+    },
+  });
+
+  const runMutation = useMutation({
+    mutationFn: async () => {
+      const testCases =
+        activeTestTab === "custom"
+          ? [{ input: customInput }]
+          : (problemQuery.data?.sampleTestCases || []).map((tc: any) => ({
+              input: tc.input || "",
+              expectedOutput: tc.expectedOutput,
+            }));
+
+      if (testCases.length === 0) {
+        throw new Error("No test cases available");
+      }
+
+      return (await problemApi.run({ language, code, testCases })).data;
+    },
+    onSuccess: (data) => {
+      setRunResults(data.results);
+      const hasError = data.results.some((r) => r.stderr);
+      const allPassed = data.results.every((r) => r.passed === true || r.passed === null);
+
+      if (hasError) {
+        toast.error("Runtime error occurred");
+      } else if (activeTestTab === "samples" && allPassed) {
+        toast.success("All test cases passed!");
+      }
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || error?.message || "Run failed");
     },
   });
 
@@ -230,14 +304,21 @@ export default function ProblemDetailPage() {
           <CodePlayground
             language={language}
             code={code}
-            setCode={setCode}
-            setLanguage={(next) => {
-              setLanguage(next);
-              setCode(templates[next] || "");
-            }}
+            setCode={handleCodeChange}
+            setLanguage={handleLanguageChange}
             onSubmit={() => submissionMutation.mutate()}
+            onRun={() => runMutation.mutate()}
             submitting={submissionMutation.isPending}
+            running={runMutation.isPending}
             result={result}
+            runResults={activeTestTab === "samples" || runResults.length > 0 ? runResults : undefined}
+            activeTestTab={activeTestTab}
+            setActiveTestTab={(tab) => {
+              setActiveTestTab(tab);
+              setRunResults([]); // Clear results when switching tabs
+            }}
+            customInput={customInput}
+            setCustomInput={setCustomInput}
           />
         </div>
       </div>
