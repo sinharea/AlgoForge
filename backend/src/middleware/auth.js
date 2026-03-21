@@ -2,8 +2,9 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const { jwtAccessSecret } = require("../config/env");
 const ApiError = require("../utils/apiError");
+const asyncHandler = require("../utils/asyncHandler");
 
-const auth = async (req, res, next) => {
+const auth = asyncHandler(async (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) {
     throw new ApiError(401, "Authorization token missing");
@@ -24,6 +25,6 @@ const auth = async (req, res, next) => {
 
   req.user = user;
   next();
-};
+});
 
 module.exports = auth;

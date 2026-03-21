@@ -49,10 +49,9 @@ const userSchema = new mongoose.Schema({
   passwordResetExpiresAt: Date,
 }, { timestamps: true });
 
-userSchema.pre("save", async function hashPassword(next) {
-  if (!this.isModified("password") || !this.password) return next();
+userSchema.pre("save", async function () {
+  if (!this.isModified("password") || !this.password) return;
   this.password = await bcrypt.hash(this.password, 12);
-  next();
 });
 
 userSchema.methods.comparePassword = function comparePassword(candidatePassword) {

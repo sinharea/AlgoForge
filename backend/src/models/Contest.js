@@ -46,12 +46,11 @@ const contestSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-contestSchema.pre("save", function syncStatus(next) {
+contestSchema.pre("save", async function () {
   const now = new Date();
   if (now < this.startTime) this.status = CONTEST_STATUS.UPCOMING;
   else if (now > this.endTime) this.status = CONTEST_STATUS.ENDED;
   else this.status = CONTEST_STATUS.RUNNING;
-  next();
 });
 
 module.exports = mongoose.model("Contest", contestSchema);

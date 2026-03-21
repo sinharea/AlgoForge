@@ -1,24 +1,33 @@
 import "./globals.css";
-import Link from "next/link";
 import Providers from "./providers";
+import Header from "@/src/components/layout/Header";
+
+export const metadata = {
+  title: "AlgoForge - Master Algorithms with Industry-Grade Challenges",
+  description: "Practice coding problems, compete in contests, and level up your skills with secure Docker-based execution.",
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className="min-h-screen bg-slate-950 text-slate-100">
+    <html lang="en" suppressHydrationWarning>
+      <body className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased">
         <Providers>
-          <header className="border-b border-slate-800 bg-slate-900/70 backdrop-blur">
-            <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-              <Link href="/" className="text-xl font-bold text-violet-400">AlgoForge</Link>
-              <nav className="flex items-center gap-6 text-sm">
-                <Link href="/problems">Problems</Link>
-                <Link href="/dashboard">Dashboard</Link>
-                <Link href="/contests">Contests</Link>
-                <Link href="/auth/login">Login</Link>
-              </nav>
+          <Header />
+          <main>{children}</main>
+          <footer className="border-t border-[var(--border-color)] bg-[var(--bg-secondary)]">
+            <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+              <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
+                <p className="text-sm text-[var(--text-muted)]">
+                  2024 AlgoForge. Built for developers.
+                </p>
+                <div className="flex gap-6 text-sm text-[var(--text-muted)]">
+                  <a href="#" className="hover:text-[var(--text-primary)]">Terms</a>
+                  <a href="#" className="hover:text-[var(--text-primary)]">Privacy</a>
+                  <a href="#" className="hover:text-[var(--text-primary)]">GitHub</a>
+                </div>
+              </div>
             </div>
-          </header>
-          <main className="mx-auto w-full max-w-7xl px-6 py-8">{children}</main>
+          </footer>
         </Providers>
       </body>
     </html>
