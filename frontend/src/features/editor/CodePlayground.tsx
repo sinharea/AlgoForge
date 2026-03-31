@@ -1,7 +1,8 @@
 "use client";
 
-import Editor from "@monaco-editor/react";
+import Editor, { OnMount } from "@monaco-editor/react";
 import { clsx } from "clsx";
+import { useEffect, useRef, useState } from "react";
 import {
   Play,
   RotateCcw,
@@ -13,6 +14,7 @@ import {
   Send,
   FlaskConical,
   FileText,
+  AlignLeft,
 } from "lucide-react";
 
 export interface RunResult {
@@ -58,6 +60,91 @@ const languages = [
   { value: "typescript", label: "TypeScript", icon: "TS", monaco: "typescript" },
 ];
 
+const DEFAULT_TIMER_MINUTES = 30;
+const MIN_TIMER_MINUTES = 1;
+const MAX_TIMER_MINUTES = 300;
+
+const countMatches = (value: string, pattern: RegExp) => value.match(pattern)?.length ?? 0;
+
+const reindentBraceLanguage = (source: string, indentUnit = "    ") => {
+  const lines = source.split("\n");
+  let indentLevel = 0;
+
+  const next = lines.map((rawLine) => {
+    const trimmed = rawLine.trim();
+    if (!trimmed) {
+      return "";
+    }
+
+    const leadingClosers = (trimmed.match(/^[}\])]+/)?.[0].length ?? 0);
+    const lineIndentLevel = Math.max(0, indentLevel - leadingClosers);
+    const normalizedLine = `${indentUnit.repeat(lineIndentLevel)}${trimmed}`;
+
+    const opens = countMatches(trimmed, /[\[{(]/g);
+    const closes = countMatches(trimmed, /[\]})]/g);
+    indentLevel = Math.max(0, indentLevel + opens - closes);
+
+    return normalizedLine;
+  });
+
+  return next.join("\n");
+};
+
+const reindentPython = (source: string, indentUnit = "    ") => {
+  const lines = source.split("\n");
+  let indentLevel = 0;
+
+  const next = lines.map((rawLine) => {
+    const trimmed = rawLine.trim();
+    if (!trimmed) {
+      return "";
+    }
+
+    if (/^(elif|else|except|finally)\b/.test(trimmed)) {
+      indentLevel = Math.max(0, indentLevel - 1);
+    }
+
+    const normalizedLine = `${indentUnit.repeat(indentLevel)}${trimmed}`;
+    const shouldIndentNext = /:\s*(#.*)?$/.test(trimmed) && !trimmed.startsWith("#");
+
+    if (shouldIndentNext) {
+      indentLevel += 1;
+    }
+
+    return normalizedLine;
+  });
+
+  return next.join("\n");
+};
+
+const fallbackAutoIndent = (source: string, language: string) => {
+  if (!source.trim()) {
+    return source;
+  }
+
+  if (language === "python") {
+    return reindentPython(source);
+  }
+
+  if (["cpp", "java", "javascript", "typescript", "go", "rust"].includes(language)) {
+    return reindentBraceLanguage(source);
+  }
+
+  return source;
+};
+
+const formatClock = (totalSeconds: number) => {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+};
+
 export default function CodePlayground({
   language,
   code,
@@ -102,6 +189,139 @@ export default function CodePlayground({
 
   const verdictInfo = getVerdictInfo();
   const monacoLang = languages.find((l) => l.value === language)?.monaco || language;
+  const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
+  const [isAutoIndenting, setIsAutoIndenting] = useState(false);
+  const [timerMinutes, setTimerMinutes] = useState(DEFAULT_TIMER_MINUTES);
+  const [timerMinutesInput, setTimerMinutesInput] = useState(String(DEFAULT_TIMER_MINUTES));
+  const [timerSeconds, setTimerSeconds] = useState(DEFAULT_TIMER_MINUTES * 60);
+  const [timerRunning, setTimerRunning] = useState(false);
+  const [showTimerPanel, setShowTimerPanel] = useState(false);
+  const [stopwatchSeconds, setStopwatchSeconds] = useState(0);
+  const [stopwatchRunning, setStopwatchRunning] = useState(false);
+  const [showStopwatchPanel, setShowStopwatchPanel] = useState(false);
+
+  useEffect(() => {
+    if (!timerRunning) return;
+
+    const intervalId = window.setInterval(() => {
+      setTimerSeconds((prev) => {
+        if (prev <= 1) {
+          setTimerRunning(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [timerRunning]);
+
+  useEffect(() => {
+    if (!stopwatchRunning) return;
+
+    const intervalId = window.setInterval(() => {
+      setStopwatchSeconds((prev) => prev + 1);
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [stopwatchRunning]);
+
+  const handleEditorMount: OnMount = (editor) => {
+    editorRef.current = editor;
+  };
+
+  const runEditorAction = async (actionId: string) => {
+    const editor = editorRef.current;
+    if (!editor) return false;
+
+    const action = editor.getAction(actionId);
+    if (action) {
+      try {
+        await action.run();
+        return true;
+      } catch {
+        // Fall through to command trigger.
+      }
+    }
+
+    try {
+      editor.trigger("auto-indent", actionId, {});
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const handleAutoIndent = async () => {
+    const editor = editorRef.current;
+    const model = editor?.getModel();
+    if (!editor || !model || isAutoIndenting) return;
+
+    setIsAutoIndenting(true);
+    try {
+      const beforeValue = model.getValue();
+
+      editor.focus();
+      await runEditorAction("editor.action.formatDocument");
+      await runEditorAction("editor.action.reindentlines");
+
+      const afterBuiltIn = model.getValue();
+      if (afterBuiltIn !== beforeValue) {
+        return;
+      }
+
+      const fallbackValue = fallbackAutoIndent(beforeValue, language);
+      if (fallbackValue === beforeValue) {
+        return;
+      }
+
+      editor.pushUndoStop();
+      editor.executeEdits("auto-indent-fallback", [
+        {
+          range: model.getFullModelRange(),
+          text: fallbackValue,
+          forceMoveMarkers: true,
+        },
+      ]);
+      editor.pushUndoStop();
+    } finally {
+      setIsAutoIndenting(false);
+    }
+  };
+
+  const applyTimerDuration = () => {
+    const parsed = Number(timerMinutesInput);
+    if (!Number.isFinite(parsed)) return;
+
+    const normalized = Math.min(MAX_TIMER_MINUTES, Math.max(MIN_TIMER_MINUTES, Math.floor(parsed)));
+    setTimerMinutes(normalized);
+    setTimerMinutesInput(String(normalized));
+    setTimerRunning(false);
+    setTimerSeconds(normalized * 60);
+    setShowTimerPanel(true);
+  };
+
+  const handleResetTimer = () => {
+    setTimerRunning(false);
+    setTimerSeconds(timerMinutes * 60);
+    setShowTimerPanel(false);
+  };
+
+  const handleResetStopwatch = () => {
+    setStopwatchRunning(false);
+    setStopwatchSeconds(0);
+    setShowStopwatchPanel(false);
+  };
+
+  const handleToggleTimerRunning = () => {
+    setShowTimerPanel(true);
+    setTimerRunning((prev) => !prev);
+  };
+
+  const handleToggleStopwatchRunning = () => {
+    setShowStopwatchPanel(true);
+    setStopwatchRunning((prev) => !prev);
+  };
 
   return (
     <div className="flex h-full min-w-0 flex-col">
@@ -130,6 +350,40 @@ export default function CodePlayground({
             title="Reset code"
           >
             <RotateCcw className="h-4 w-4" />
+          </button>
+          <button
+            onClick={handleAutoIndent}
+            disabled={isAutoIndenting}
+            className="btn btn-ghost whitespace-nowrap px-3 py-2"
+            title="Auto indent code"
+          >
+            {isAutoIndenting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Indenting...
+              </>
+            ) : (
+              <>
+                <AlignLeft className="h-4 w-4" />
+                Auto Indent
+              </>
+            )}
+          </button>
+          <button
+            onClick={() => setShowTimerPanel((prev) => !prev)}
+            className="btn btn-ghost whitespace-nowrap px-3 py-2"
+            title="Show timer"
+          >
+            <Clock className="h-4 w-4" />
+            Timer
+          </button>
+          <button
+            onClick={() => setShowStopwatchPanel((prev) => !prev)}
+            className="btn btn-ghost whitespace-nowrap px-3 py-2"
+            title="Show stopwatch"
+          >
+            <Play className="h-4 w-4" />
+            Stopwatch
           </button>
           <button
             onClick={onRun}
@@ -168,8 +422,99 @@ export default function CodePlayground({
         </div>
       </div>
 
+      {(showTimerPanel || showStopwatchPanel) && (
+        <div className="flex flex-wrap items-center gap-3 border-x border-b border-[var(--border-color)] bg-[var(--bg-secondary)] px-4 py-2">
+          {showTimerPanel && (
+            <div className="flex flex-wrap items-center gap-2 rounded-md bg-[var(--bg-primary)] px-2.5 py-1.5 text-xs">
+              <span className="flex items-center gap-1 font-medium uppercase tracking-wide text-[var(--text-muted)]">
+                <Clock className="h-3.5 w-3.5" />
+                Timer
+              </span>
+              <span className="min-w-[56px] font-mono text-sm text-[var(--text-primary)]">{formatClock(timerSeconds)}</span>
+              <input
+                type="number"
+                min={MIN_TIMER_MINUTES}
+                max={MAX_TIMER_MINUTES}
+                value={timerMinutesInput}
+                onChange={(e) => setTimerMinutesInput(e.target.value)}
+                className="h-7 w-16 rounded border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 text-xs text-[var(--text-primary)]"
+                aria-label="Timer minutes"
+              />
+              <button
+                type="button"
+                onClick={applyTimerDuration}
+                disabled={timerRunning}
+                className="rounded border border-[var(--border-color)] px-2 py-0.5 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Set
+              </button>
+              <button
+                type="button"
+                onClick={handleToggleTimerRunning}
+                disabled={timerSeconds === 0}
+                className="rounded border border-[var(--border-color)] px-2 py-0.5 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {timerRunning ? "Pause" : "Start"}
+              </button>
+              <button
+                type="button"
+                onClick={handleResetTimer}
+                className="rounded border border-[var(--border-color)] px-2 py-0.5 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+              >
+                Reset
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setTimerRunning(false);
+                  setShowTimerPanel(false);
+                }}
+                className="rounded border border-[var(--border-color)] px-2 py-0.5 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+              >
+                Hide
+              </button>
+            </div>
+          )}
+
+          {showStopwatchPanel && (
+            <div className="flex flex-wrap items-center gap-2 rounded-md bg-[var(--bg-primary)] px-2.5 py-1.5 text-xs">
+              <span className="flex items-center gap-1 font-medium uppercase tracking-wide text-[var(--text-muted)]">
+                <Play className="h-3.5 w-3.5" />
+                Stopwatch
+              </span>
+              <span className="min-w-[56px] font-mono text-sm text-[var(--text-primary)]">{formatClock(stopwatchSeconds)}</span>
+              <button
+                type="button"
+                onClick={handleToggleStopwatchRunning}
+                className="rounded border border-[var(--border-color)] px-2 py-0.5 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+              >
+                {stopwatchRunning ? "Pause" : "Start"}
+              </button>
+              <button
+                type="button"
+                onClick={handleResetStopwatch}
+                className="rounded border border-[var(--border-color)] px-2 py-0.5 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+              >
+                Reset
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setStopwatchRunning(false);
+                  setShowStopwatchPanel(false);
+                }}
+                className="rounded border border-[var(--border-color)] px-2 py-0.5 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+              >
+                Hide
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="monaco-container flex-1 rounded-none border-x border-[var(--border-color)]" style={{ minHeight: '400px' }}>
         <Editor
+          onMount={handleEditorMount}
           height="100%"
           language={monacoLang}
           value={code}

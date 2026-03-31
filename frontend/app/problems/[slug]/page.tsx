@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import toast from "react-hot-toast";
 import { clsx } from "clsx";
@@ -96,6 +96,10 @@ const buildCodeDiff = (leftCode = "", rightCode = "") => {
 export default function ProblemDetailPage() {
   useProtectedRoute();
   const { slug } = useParams<{ slug: string }>();
+  const searchParams = useSearchParams();
+  const contestId = searchParams.get("contestId");
+  const contestTitle = searchParams.get("contestTitle");
+  const isContestMode = Boolean(contestId);
   const [language, setLanguage] = useState("cpp");
   const [code, setCode] = useState(templates.cpp);
   const [submissionId, setSubmissionId] = useState<string | null>(null);
@@ -112,36 +116,42 @@ export default function ProblemDetailPage() {
   // Load saved code from localStorage on mount and when slug/language changes
   useEffect(() => {
     if (!slug) return;
+
+    if (isContestMode) {
+      setCode(templates[language] || "");
+      return;
+    }
+
     const savedCode = localStorage.getItem(getStorageKey(slug, language));
     if (savedCode) {
       setCode(savedCode);
     } else {
       setCode(templates[language] || "");
     }
-  }, [slug, language]);
+  }, [slug, language, isContestMode]);
 
   // Save code to localStorage whenever it changes
   const handleCodeChange = useCallback(
     (newCode: string) => {
       setCode(newCode);
-      if (slug) {
+      if (slug && !isContestMode) {
         localStorage.setItem(getStorageKey(slug, language), newCode);
       }
     },
-    [slug, language]
+    [slug, language, isContestMode]
   );
 
   // Handle language change
   const handleLanguageChange = useCallback(
     (newLanguage: string) => {
       setLanguage(newLanguage);
-      if (slug) {
+      if (slug && !isContestMode) {
         localStorage.setItem(getLastLanguageKey(slug), newLanguage);
       }
       // Clear run results when changing language
       setRunResults([]);
     },
-    [slug]
+    [slug, isContestMode]
   );
 
   const problemQuery = useQuery({
@@ -169,6 +179,7 @@ export default function ProblemDetailPage() {
           problemId: problemQuery.data._id,
           language,
           code,
+          contestId: contestId || undefined,
         })
       ).data,
     onSuccess: (data) => {
@@ -176,7 +187,7 @@ export default function ProblemDetailPage() {
       setSubmissionId(newSubmissionId);
       setSelectedSubmissionId(newSubmissionId || null);
       setActiveTab("submissions");
-      if (slug) {
+      if (slug && !isContestMode) {
         localStorage.setItem(getLastLanguageKey(slug), language);
       }
       setRunResults([]); // Clear run results when submitting
@@ -278,6 +289,11 @@ export default function ProblemDetailPage() {
   useEffect(() => {
     if (!slug || languageInitialized || !submissionsQuery.isFetched) return;
 
+    if (isContestMode) {
+      setLanguageInitialized(true);
+      return;
+    }
+
     const savedLanguage = localStorage.getItem(getLastLanguageKey(slug));
     if (savedLanguage && templates[savedLanguage]) {
       setLanguage(savedLanguage);
@@ -292,7 +308,7 @@ export default function ProblemDetailPage() {
     }
 
     setLanguageInitialized(true);
-  }, [slug, languageInitialized, mySubmissions, submissionsQuery.isFetched]);
+  }, [slug, languageInitialized, mySubmissions, submissionsQuery.isFetched, isContestMode]);
 
   useEffect(() => {
     if (activeTab !== "submissions") return;
@@ -344,6 +360,16 @@ export default function ProblemDetailPage() {
                   </div>
                   <DifficultyBadge difficulty={problem.difficulty} />
                 </div>
+
+                {contestId && (
+                  <div className="mb-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
+                    <p className="font-medium">Contest Mode {contestTitle ? `| ${contestTitle}` : ""}</p>
+                    <p className="mt-1 text-xs text-emerald-300/90">
+                      Submissions from this page are counted for the contest leaderboard.
+                    </p>
+                  </div>
+                )}
+
                 <div className="flex flex-wrap items-center gap-3 text-sm text-[var(--text-secondary)]">
                   {problem.timeLimit && (
                     <div className="flex items-center gap-1">
