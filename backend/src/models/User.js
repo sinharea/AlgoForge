@@ -2,6 +2,9 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 const { USER_ROLES, AUTH_PROVIDER } = require("../constants");
 
+// Default starting rating
+const DEFAULT_RATING = 1500;
+
 const userSchema = new mongoose.Schema({
   name: {
     type: String,
@@ -47,6 +50,20 @@ const userSchema = new mongoose.Schema({
   emailVerificationExpiresAt: Date,
   passwordResetTokenHash: String,
   passwordResetExpiresAt: Date,
+  // Rating system fields
+  rating: {
+    type: Number,
+    default: DEFAULT_RATING,
+    index: true,
+  },
+  maxRating: {
+    type: Number,
+    default: DEFAULT_RATING,
+  },
+  contestsParticipated: {
+    type: Number,
+    default: 0,
+  },
 }, { timestamps: true });
 
 userSchema.pre("save", async function () {
@@ -60,3 +77,4 @@ userSchema.methods.comparePassword = function comparePassword(candidatePassword)
 };
 
 module.exports = mongoose.model("User", userSchema);
+module.exports.DEFAULT_RATING = DEFAULT_RATING;

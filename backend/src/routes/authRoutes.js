@@ -12,7 +12,7 @@ const {
 const { passport, oauthCallback } = require("../controllers/oauthController");
 const validate = require("../middleware/validate");
 const auth = require("../middleware/auth");
-const { authLimiter } = require("../middleware/rateLimiter");
+const { authLimiter, loginLimiter } = require("../middleware/rateLimiter");
 const {
   registerSchema,
   loginSchema,
@@ -22,13 +22,14 @@ const {
   verifyEmailSchema,
 } = require("../validators/authValidator");
 
+// Apply general auth rate limiter to all routes
 router.use(authLimiter);
 
 router.post("/register", validate(registerSchema), register);
-router.post("/login", validate(loginSchema), login);
+router.post("/login", loginLimiter, validate(loginSchema), login); // Extra strict limiter for login
 router.post("/refresh", validate(refreshSchema), refresh);
 router.post("/logout", auth, logout);
-router.post("/forgot-password", validate(forgotPasswordSchema), forgotPassword);
+router.post("/forgot-password", loginLimiter, validate(forgotPasswordSchema), forgotPassword); // Extra strict for password reset
 router.post("/reset-password", validate(resetPasswordSchema), resetPassword);
 router.post("/verify-email", validate(verifyEmailSchema), verifyEmail);
 

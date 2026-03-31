@@ -3,7 +3,7 @@ const router = express.Router();
 
 const auth = require("../middleware/auth");
 const validate = require("../middleware/validate");
-const { submissionLimiter } = require("../middleware/rateLimiter");
+const { submissionLimiter, runLimiter } = require("../middleware/rateLimiter");
 const { createSubmissionSchema, runCodeSchema } = require("../validators/submissionValidator");
 
 const {
@@ -13,11 +13,19 @@ const {
   runCode,
 } = require("../controllers/submissionController");
 
-router.use(auth, submissionLimiter);
+// All routes require authentication
+router.use(auth);
 
+// Get user's submissions - no rate limit needed
 router.get("/me", getMySubmissions);
-router.post("/", validate(createSubmissionSchema), createSubmission);
-router.post("/run", validate(runCodeSchema), runCode);
+
+// Submit code - stricter rate limit
+router.post("/", submissionLimiter, validate(createSubmissionSchema), createSubmission);
+
+// Run code (without submitting) - more lenient rate limit
+router.post("/run", runLimiter, validate(runCodeSchema), runCode);
+
+// Get specific submission
 router.get("/:id", getSubmissionById);
 
 module.exports = router;

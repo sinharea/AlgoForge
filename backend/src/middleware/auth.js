@@ -4,6 +4,8 @@ const { jwtAccessSecret } = require("../config/env");
 const ApiError = require("../utils/apiError");
 const asyncHandler = require("../utils/asyncHandler");
 
+const JWT_ALGORITHM = "HS256";
+
 const auth = asyncHandler(async (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) {
@@ -13,7 +15,7 @@ const auth = asyncHandler(async (req, res, next) => {
   const token = authHeader.split(" ")[1];
   let payload;
   try {
-    payload = jwt.verify(token, jwtAccessSecret);
+    payload = jwt.verify(token, jwtAccessSecret, { algorithms: [JWT_ALGORITHM] });
   } catch (error) {
     throw new ApiError(401, "Invalid or expired token");
   }

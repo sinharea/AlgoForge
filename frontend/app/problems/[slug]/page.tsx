@@ -5,13 +5,14 @@ import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import toast from "react-hot-toast";
 import { clsx } from "clsx";
-import { Clock, Tag, Copy, Check, BookOpen, FileCode, TestTube } from "lucide-react";
+import { Clock, Tag, Copy, Check, BookOpen, FileCode, TestTube, CheckCircle2, XCircle, AlertTriangle, Loader2 } from "lucide-react";
 import { problemApi, RunResult } from "@/src/api/problemApi";
 import CodePlayground from "@/src/features/editor/CodePlayground";
 import { EditorSkeleton } from "@/src/components/ui/Skeleton";
 import ErrorState from "@/src/components/ui/ErrorState";
-import { DifficultyBadge } from "@/src/components/ui/Badge";
+import { DifficultyBadge, StatusBadge } from "@/src/components/ui/Badge";
 import useProtectedRoute from "@/src/hooks/useProtectedRoute";
+import { formatDistanceToNow } from "date-fns";
 
 const templates: Record<string, string> = {
   cpp: "#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    \n    return 0;\n}",
@@ -24,6 +25,14 @@ const templates: Record<string, string> = {
 };
 
 const getStorageKey = (slug: string, language: string) => `algoforge_code_${slug}_${language}`;
+
+const getVerdictIcon = (verdict: string) => {
+  switch (verdict) {
+    case "Accepted": return <CheckCircle2 className="h-4 w-4 text-emerald-400" />;
+    case "Wrong Answer": return <XCircle className="h-4 w-4 text-rose-400" />;
+    default: return <AlertTriangle className="h-4 w-4 text-amber-400" />;
+  }
+};
 
 export default function ProblemDetailPage() {
   useProtectedRoute();
@@ -75,6 +84,18 @@ export default function ProblemDetailPage() {
     enabled: Boolean(slug),
   });
 
+  // Fetch submission history for this problem
+  const submissionsQuery = useQuery({
+    queryKey: ["my-submissions", problemQuery.data?._id],
+    queryFn: async () => (await problemApi.mySubmissions()).data,
+    enabled: Boolean(problemQuery.data?._id),
+    select: (data) => {
+      // Filter to only this problem's submissions
+      const items = data.items || data || [];
+      return items.filter((s: any) => s.problem?._id === problemQuery.data?._id || s.problem === problemQuery.data?._id);
+    },
+  });
+
   const submissionMutation = useMutation({
     mutationFn: async () =>
       (
@@ -88,9 +109,12 @@ export default function ProblemDetailPage() {
       setSubmissionId(data.submissionId || data.submission?._id);
       setRunResults([]); // Clear run results when submitting
       toast.success("Submission queued");
+      // Refetch submissions list
+      submissionsQuery.refetch();
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message || "Submit failed");
+      const errorMsg = error?.response?.data?.error?.message || error?.response?.data?.message || "Submit failed";
+      toast.error(errorMsg);
     },
   });
 
@@ -122,7 +146,8 @@ export default function ProblemDetailPage() {
       }
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message || error?.message || "Run failed");
+      const errorMsg = error?.response?.data?.error?.message || error?.response?.data?.message || error?.message || "Run failed";
+      toast.error(errorMsg);
     },
   });
 
@@ -132,7 +157,7 @@ export default function ProblemDetailPage() {
     enabled: Boolean(submissionId),
     refetchInterval: (query) => {
       const status = (query.state.data as any)?.status;
-      return status === "queued" ? 2000 : false;
+      return status === "queued" || status === "judging" ? 2000 : false;
     },
   });
 
@@ -175,6 +200,7 @@ export default function ProblemDetailPage() {
   );
 
   const problem = problemQuery.data;
+  const mySubmissions = submissionsQuery.data || [];
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
@@ -227,6 +253,11 @@ export default function ProblemDetailPage() {
                 >
                   <FileCode className="h-4 w-4" />
                   Submissions
+                  {mySubmissions.length > 0 && (
+                    <span className="rounded-full bg-[var(--bg-tertiary)] px-1.5 py-0.5 text-xs">
+                      {mySubmissions.length}
+                    </span>
+                  )}
                 </button>
               </div>
 
@@ -292,8 +323,63 @@ export default function ProblemDetailPage() {
               )}
 
               {activeTab === "submissions" && (
-                <div className="flex items-center justify-center py-12 text-[var(--text-muted)]">
-                  Submission history coming soon
+                <div>
+                  {submissionsQuery.isLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-6 w-6 animate-spin text-[var(--text-muted)]" />
+                    </div>
+                  ) : mySubmissions.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                      <FileCode className="mb-3 h-10 w-10 text-[var(--text-muted)]" />
+                      <p className="text-[var(--text-muted)]">No submissions yet</p>
+                      <p className="mt-1 text-sm text-[var(--text-muted)]">Submit your solution to see it here</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {mySubmissions.slice(0, 10).map((sub: any) => (
+                        <div
+                          key={sub._id}
+                          className={clsx(
+                            "rounded-lg border p-3 transition-colors",
+                            sub.verdict === "Accepted"
+                              ? "border-emerald-500/30 bg-emerald-500/5"
+                              : sub.verdict === "Wrong Answer"
+                                ? "border-rose-500/30 bg-rose-500/5"
+                                : "border-[var(--border-color)] bg-[var(--bg-primary)]"
+                          )}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              {getVerdictIcon(sub.verdict)}
+                              <span className={clsx(
+                                "font-medium",
+                                sub.verdict === "Accepted" && "text-emerald-400",
+                                sub.verdict === "Wrong Answer" && "text-rose-400",
+                                !["Accepted", "Wrong Answer"].includes(sub.verdict) && "text-amber-400"
+                              )}>
+                                {sub.verdict || sub.status}
+                              </span>
+                            </div>
+                            <span className="text-xs text-[var(--text-muted)]">
+                              {formatDistanceToNow(new Date(sub.createdAt), { addSuffix: true })}
+                            </span>
+                          </div>
+                          <div className="mt-2 flex items-center gap-4 text-xs text-[var(--text-secondary)]">
+                            <span className="rounded bg-[var(--bg-tertiary)] px-2 py-0.5">{sub.language}</span>
+                            {sub.runtime && (
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {sub.runtime}ms
+                              </span>
+                            )}
+                            {sub.result?.passedCount !== undefined && (
+                              <span>{sub.result.passedCount}/{sub.result.totalCount} passed</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
