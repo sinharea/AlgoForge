@@ -170,8 +170,8 @@ const getMyProfile = async ({ userId }) => {
   return sanitizeUser(user);
 };
 
-const updateMyProfile = async ({ userId, name, avatarUrl }) => {
-  const user = await User.findById(userId);
+const updateMyProfile = async ({ userId, name, avatarUrl, currentPassword, newPassword }) => {
+  const user = await User.findById(userId).select("+password");
   if (!user) throw new ApiError(404, "User not found");
 
   if (typeof name === "string") {
@@ -180,6 +180,26 @@ const updateMyProfile = async ({ userId, name, avatarUrl }) => {
 
   if (typeof avatarUrl === "string") {
     user.avatarUrl = avatarUrl.trim();
+  }
+
+  const wantsPasswordChange =
+    typeof currentPassword === "string" || typeof newPassword === "string";
+
+  if (wantsPasswordChange) {
+    if (!currentPassword || !newPassword) {
+      throw new ApiError(400, "Both current password and new password are required");
+    }
+
+    if (user.provider !== AUTH_PROVIDER.LOCAL) {
+      throw new ApiError(400, "Password change is only available for email/password accounts");
+    }
+
+    const isValid = await user.comparePassword(currentPassword);
+    if (!isValid) {
+      throw new ApiError(401, "Current password is incorrect");
+    }
+
+    user.password = newPassword;
   }
 
   await user.save();

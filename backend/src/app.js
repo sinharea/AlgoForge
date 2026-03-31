@@ -3,6 +3,7 @@ const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const mongoose = require("mongoose");
+const path = require("path");
 const { passport } = require("./controllers/oauthController");
 
 const routes = require("./routes");
@@ -17,6 +18,7 @@ const app = express();
 app.use(helmet({
   contentSecurityPolicy: nodeEnv === "production",
   crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: "cross-origin" },
 }));
 
 // CORS configuration
@@ -47,6 +49,9 @@ app.use(morgan(nodeEnv === "production" ? "combined" : "dev"));
 
 // Passport for OAuth
 app.use(passport.initialize());
+
+// Public uploaded files (avatars)
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 // Health check endpoint (no rate limit)
 app.get("/health", (req, res) => {

@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import toast from "react-hot-toast";
-import { Loader2, Save } from "lucide-react";
+import { Loader2, Save, Upload } from "lucide-react";
 import { authApi } from "@/src/api/authApi";
 import useProtectedRoute from "@/src/hooks/useProtectedRoute";
 import { useAuthContext } from "@/src/context/AuthContext";
@@ -21,6 +21,11 @@ export default function ProfilePage() {
   const { user, updateUser } = useAuthContext();
   const [name, setName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   const profileQuery = useQuery({
     queryKey: ["profile"],
@@ -34,15 +39,38 @@ export default function ProfilePage() {
     setAvatarUrl(profile.avatarUrl || "");
   }, [profileQuery.data, user]);
 
+  useEffect(() => {
+    if (!avatarFile) {
+      setAvatarPreview(avatarUrl);
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(avatarFile);
+    setAvatarPreview(objectUrl);
+
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [avatarFile, avatarUrl]);
+
   const updateMutation = useMutation({
     mutationFn: async () => {
-      const payload: { name?: string; avatarUrl?: string } = {};
-      if (name.trim()) payload.name = name.trim();
-      payload.avatarUrl = avatarUrl.trim();
+      const payload = new FormData();
+      payload.append("name", name.trim());
+      if (avatarFile) {
+        payload.append("avatar", avatarFile);
+      }
+      if (currentPassword && newPassword) {
+        payload.append("currentPassword", currentPassword);
+        payload.append("newPassword", newPassword);
+      }
       return (await authApi.updateMe(payload)).data.user as ProfileUser;
     },
     onSuccess: (updatedUser) => {
       updateUser(updatedUser);
+      setAvatarFile(null);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setAvatarUrl(updatedUser.avatarUrl || "");
       toast.success("Profile updated");
     },
     onError: (error: any) => {
@@ -61,6 +89,17 @@ export default function ProfilePage() {
       toast.error("Name is required");
       return;
     }
+
+    if ((currentPassword || newPassword) && (!currentPassword || !newPassword)) {
+      toast.error("Enter both current and new password");
+      return;
+    }
+
+    if (newPassword && newPassword !== confirmPassword) {
+      toast.error("New password and confirm password must match");
+      return;
+    }
+
     updateMutation.mutate();
   };
 
@@ -79,15 +118,15 @@ export default function ProfilePage() {
       <div className="mb-6">
         <h1 className="text-3xl font-bold">Edit Profile</h1>
         <p className="mt-2 text-[var(--text-secondary)]">
-          Update your display name and profile image.
+          Update your username, password, and profile image.
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="card space-y-5">
         <div className="flex flex-wrap items-center gap-4">
-          {avatarUrl ? (
+          {avatarPreview ? (
             <img
-              src={avatarUrl}
+              src={avatarPreview}
               alt="Profile"
               className="h-16 w-16 rounded-full border border-[var(--border-color)] object-cover"
             />
@@ -109,19 +148,63 @@ export default function ProfilePage() {
             onChange={(e) => setName(e.target.value)}
             className="input"
             maxLength={80}
-            placeholder="Your name"
+            placeholder="Your username"
           />
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-medium">Profile image URL</label>
+          <label className="mb-2 block text-sm font-medium">Upload profile image</label>
+          <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] px-4 py-2 text-sm text-[var(--text-secondary)] hover:border-[var(--accent-primary)]">
+            <Upload className="h-4 w-4" />
+            <span>{avatarFile ? avatarFile.name : "Choose image (max 2MB)"}</span>
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0] || null;
+                if (file && file.size > 2 * 1024 * 1024) {
+                  toast.error("Image must be 2MB or smaller");
+                  return;
+                }
+                setAvatarFile(file);
+              }}
+            />
+          </label>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="mb-2 block text-sm font-medium">Current password</label>
+            <input
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              className="input"
+              placeholder="Enter current password"
+            />
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-medium">New password</label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="input"
+              placeholder="At least 8 characters"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="mb-2 block text-sm font-medium">Confirm new password</label>
           <input
-            value={avatarUrl}
-            onChange={(e) => setAvatarUrl(e.target.value)}
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
             className="input"
-            placeholder="https://example.com/avatar.jpg"
+            placeholder="Re-enter new password"
           />
-          <p className="mt-1 text-xs text-[var(--text-muted)]">Use a direct http(s) image link.</p>
         </div>
 
         <button type="submit" disabled={updateMutation.isPending} className="btn btn-primary">

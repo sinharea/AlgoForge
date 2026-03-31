@@ -105,15 +105,15 @@ export default function CodePlayground({
 
   return (
     <div className="flex h-full min-w-0 flex-col">
-      <div className="flex flex-wrap items-start justify-between gap-3 rounded-t-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] px-4 py-3">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
+      <div className="flex flex-col gap-3 rounded-t-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] px-4 py-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex min-w-0 flex-col gap-1">
           <label className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
             Language
           </label>
           <select
             value={language}
             onChange={(e) => setLanguage(e.target.value)}
-            className="input select h-9 min-w-[150px] max-w-full py-1"
+            className="input select w-full min-w-[150px] leading-5 sm:w-[220px]"
           >
             {languages.map((lang) => (
               <option key={lang.value} value={lang.value}>
@@ -123,7 +123,7 @@ export default function CodePlayground({
           </select>
         </div>
 
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
           <button
             onClick={handleReset}
             className="btn btn-ghost p-2"

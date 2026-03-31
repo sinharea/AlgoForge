@@ -22,6 +22,36 @@ export default function ProblemsPage() {
 
   const problems = data?.items || [];
 
+  const submissionsQuery = useQuery({
+    queryKey: ["my-submissions-progress"],
+    queryFn: async () => (await problemApi.mySubmissions({ page: 1, limit: 1000 })).data,
+    retry: false,
+  });
+
+  const progressByProblem = useMemo(() => {
+    const statusMap = new Map<string, "accepted" | "attempted">();
+    const items = submissionsQuery.data?.items || submissionsQuery.data || [];
+
+    items.forEach((submission: any) => {
+      const problemId = submission?.problem?._id || submission?.problem;
+      if (!problemId) return;
+
+      const key = String(problemId);
+      const isAccepted = submission?.verdict === "Accepted";
+
+      if (isAccepted) {
+        statusMap.set(key, "accepted");
+        return;
+      }
+
+      if (!statusMap.has(key)) {
+        statusMap.set(key, "attempted");
+      }
+    });
+
+    return statusMap;
+  }, [submissionsQuery.data]);
+
   const stats = useMemo(() => {
     const all = problems.length;
     const easy = problems.filter((p: any) => p.difficulty === "Easy").length;
@@ -80,7 +110,7 @@ export default function ProblemsPage() {
               value={filters.search}
               onChange={(e) => setFilters({ ...filters, search: e.target.value })}
               placeholder="Search problems..."
-              className="input pl-10"
+              className="input !pl-10"
             />
           </div>
 
@@ -89,7 +119,7 @@ export default function ProblemsPage() {
             <select
               value={filters.difficulty}
               onChange={(e) => setFilters({ ...filters, difficulty: e.target.value })}
-              className="input select pl-10"
+              className="input select !pl-10"
             >
               <option value="">All Difficulties</option>
               {difficulties.slice(1).map((d) => (
@@ -104,7 +134,7 @@ export default function ProblemsPage() {
               value={filters.tags}
               onChange={(e) => setFilters({ ...filters, tags: e.target.value })}
               placeholder="Filter by tags (comma separated)"
-              className="input pl-10"
+              className="input !pl-10"
               list="tag-suggestions"
             />
             <datalist id="tag-suggestions">
@@ -163,6 +193,7 @@ export default function ProblemsPage() {
             </thead>
             <tbody className="divide-y divide-[var(--border-color)] bg-[var(--bg-primary)]">
               {problems.map((problem: any, idx: number) => (
+                
                 <tr
                   key={problem._id}
                   className={clsx(
@@ -171,7 +202,13 @@ export default function ProblemsPage() {
                   )}
                 >
                   <td className="px-4 py-4">
-                    <Circle className="h-5 w-5 text-[var(--text-muted)]" />
+                    {progressByProblem.get(String(problem._id)) === "accepted" ? (
+                      <CheckCircle2 className="h-5 w-5 text-emerald-400" title="Solved" />
+                    ) : progressByProblem.get(String(problem._id)) === "attempted" ? (
+                      <Circle className="h-5 w-5 text-amber-400" title="Attempted" />
+                    ) : (
+                      <Circle className="h-5 w-5 text-[var(--text-muted)]" title="Not started" />
+                    )}
                   </td>
                   <td className="px-4 py-4 text-sm font-mono text-[var(--text-secondary)]">
                     {problem.questionNumber || "-"}

@@ -5,7 +5,8 @@ export const authApi = {
   register: (payload: { name: string; email: string; password: string }) =>
     api.post("/auth/register", payload),
   me: () => api.get("/auth/me"),
-  updateMe: (payload: { name?: string; avatarUrl?: string }) => api.patch("/auth/me", payload),
+  updateMe: (payload: FormData | { name?: string; currentPassword?: string; newPassword?: string }) =>
+    api.patch("/auth/me", payload),
   meDashboard: () => api.get("/recommendations/dashboard"),
   recommendations: () => api.get("/recommendations"),
 };

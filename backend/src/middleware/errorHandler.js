@@ -4,6 +4,16 @@ const logger = require("../utils/logger");
 const { nodeEnv } = require("../config/env");
 
 module.exports = (err, req, res, next) => {
+  if (err?.name === "MulterError") {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: "UPLOAD_ERROR",
+        message: err.code === "LIMIT_FILE_SIZE" ? "Image must be 2MB or smaller" : err.message,
+      },
+    });
+  }
+
   // Zod validation errors
   if (err instanceof ZodError) {
     return res.status(400).json({

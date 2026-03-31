@@ -52,7 +52,15 @@ const me = asyncHandler(async (req, res) => {
 });
 
 const updateMe = asyncHandler(async (req, res) => {
-  const user = await updateMyProfile({ userId: req.user._id, ...req.body });
+  const uploadedAvatarUrl = req.file
+    ? `${req.protocol}://${req.get("host")}/uploads/avatars/${req.file.filename}`
+    : undefined;
+
+  const user = await updateMyProfile({
+    userId: req.user._id,
+    ...req.body,
+    ...(uploadedAvatarUrl ? { avatarUrl: uploadedAvatarUrl } : {}),
+  });
   res.json({ user });
 });
 

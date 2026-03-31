@@ -22,5 +22,5 @@ export const problemApi = {
   run: (payload: { language: string; code: string; testCases: TestCase[] }) =>
     api.post<{ results: RunResult[] }>("/submissions/run", payload),
   submission: (id: string) => api.get(`/submissions/${id}`),
-  mySubmissions: () => api.get("/submissions/me"),
+  mySubmissions: (params?: Record<string, unknown>) => api.get("/submissions/me", { params }),
 };

@@ -14,6 +14,7 @@ const {
 const { startOAuth, finishOAuth } = require("../controllers/oauthController");
 const validate = require("../middleware/validate");
 const auth = require("../middleware/auth");
+const { uploadAvatar } = require("../middleware/uploadAvatar");
 const { authLimiter, loginLimiter } = require("../middleware/rateLimiter");
 const {
   registerSchema,
@@ -36,7 +37,7 @@ router.post("/forgot-password", loginLimiter, validate(forgotPasswordSchema), fo
 router.post("/reset-password", validate(resetPasswordSchema), resetPassword);
 router.post("/verify-email", validate(verifyEmailSchema), verifyEmail);
 router.get("/me", auth, me);
-router.patch("/me", auth, validate(updateProfileSchema), updateMe);
+router.patch("/me", auth, uploadAvatar.single("avatar"), validate(updateProfileSchema), updateMe);
 
 router.get("/oauth/google", startOAuth("google", { scope: ["profile", "email"] }));
 router.get("/oauth/google/callback", finishOAuth("google"));
