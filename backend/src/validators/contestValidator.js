@@ -9,6 +9,13 @@ const createContestSchema = z.object({
   problems: z.array(z.string().min(10)).min(1),
 });
 
+const updateContestSchema = createContestSchema
+  .partial()
+  .refine((payload) => Object.keys(payload).length > 0, {
+    message: "At least one field is required to update contest",
+  });
+
 module.exports = {
   createContestSchema,
+  updateContestSchema,
 };

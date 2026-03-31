@@ -324,6 +324,16 @@ const run = async () => {
     participants: [{ user: alice._id }, { user: bob._id }],
   });
 
+  await Contest.create({
+    title: "Dummy Live Contest",
+    description: "Demo live contest for UI/testing. Keep this running during local development.",
+    startTime: new Date(Date.now() - 10 * 60 * 1000), // Started 10 min ago
+    endTime: new Date(Date.now() + 50 * 60 * 1000), // Ends in 50 min
+    duration: 60,
+    problems: problems.slice(0, 3).map((p) => p._id),
+    participants: [{ user: admin._id }],
+  });
+
   const upcomingContest1 = await Contest.create({
     title: "AlgoForge Beginner Cup",
     description: "A friendly competition for those new to competitive programming. Easy to medium problems.",
