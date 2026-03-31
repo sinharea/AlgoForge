@@ -203,11 +203,17 @@ export default function ProblemsPage() {
                 >
                   <td className="px-4 py-4">
                     {progressByProblem.get(String(problem._id)) === "accepted" ? (
-                      <CheckCircle2 className="h-5 w-5 text-emerald-400" title="Solved" />
+                      <span title="Solved" className="inline-flex">
+                        <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                      </span>
                     ) : progressByProblem.get(String(problem._id)) === "attempted" ? (
-                      <Circle className="h-5 w-5 text-amber-400" title="Attempted" />
+                      <span title="Attempted" className="inline-flex">
+                        <Circle className="h-5 w-5 text-amber-400" />
+                      </span>
                     ) : (
-                      <Circle className="h-5 w-5 text-[var(--text-muted)]" title="Not started" />
+                      <span title="Not started" className="inline-flex">
+                        <Circle className="h-5 w-5 text-[var(--text-muted)]" />
+                      </span>
                     )}
                   </td>
                   <td className="px-4 py-4 text-sm font-mono text-[var(--text-secondary)]">

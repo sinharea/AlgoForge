@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import { clsx } from "clsx";
+import { motion } from "framer-motion";
 import {
   Code2,
   LayoutDashboard,
@@ -59,14 +60,21 @@ export default function Header() {
                   key={item.href}
                   href={item.href}
                   className={clsx(
-                    "flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                    "relative flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                     isActive
-                      ? "bg-[var(--accent-primary)]/10 text-[var(--accent-secondary)]"
+                      ? "text-[var(--accent-secondary)]"
                       : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
                   )}
                 >
+                  {isActive ? (
+                    <motion.span
+                      layoutId="nav-active-pill"
+                      className="absolute inset-0 rounded-lg bg-[var(--accent-primary)]/12"
+                      transition={{ type: "spring", stiffness: 340, damping: 30 }}
+                    />
+                  ) : null}
                   <Icon className="h-4 w-4" />
-                  {item.label}
+                  <span className="relative z-10">{item.label}</span>
                 </Link>
               );
             })}
@@ -115,7 +123,7 @@ export default function Header() {
                     className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
                   >
                     <User className="h-4 w-4" />
-                    Edit profile
+                    Settings
                   </Link>
                   <button
                     onClick={() => {
@@ -206,7 +214,7 @@ export default function Header() {
                     className="mb-2 flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)]"
                   >
                     <User className="h-5 w-5" />
-                    Edit profile
+                    Settings
                   </Link>
                   <button
                     onClick={() => {

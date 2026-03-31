@@ -1,6 +1,17 @@
 import "./globals.css";
 import Providers from "./providers";
 import Header from "@/src/components/layout/Header";
+import { Manrope, Space_Grotesk } from "next/font/google";
+
+const bodyFont = Manrope({
+  subsets: ["latin"],
+  variable: "--font-body",
+});
+
+const headingFont = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-heading",
+});
 
 export const metadata = {
   title: "AlgoForge - Master Algorithms with Industry-Grade Challenges",
@@ -10,7 +21,7 @@ export const metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased">
+      <body className={`${bodyFont.variable} ${headingFont.variable} min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased`}>
         <Providers>
           <Header />
           <main>{children}</main>
