@@ -1,5 +1,4 @@
-const { execFile, spawn } = require("child_process");
-const { promisify } = require("util");
+const { spawn } = require("child_process");
 const os = require("os");
 const path = require("path");
 const fs = require("fs");
@@ -16,8 +15,6 @@ const {
   localExecutionTimeoutMs,
   nodeEnv,
 } = require("../config/env");
-
-const execFileAsync = promisify(execFile);
 
 // Maximum output size (64KB) to prevent memory exhaustion
 const MAX_OUTPUT_SIZE = 65536;
@@ -81,6 +78,60 @@ const isMemoryError = (error) => {
          (error.stderr && /out of memory|memory limit|oom/i.test(error.stderr)) ||
          (error.message && /out of memory|memory limit|oom/i.test(error.message));
 };
+
+const runCommand = ({ cmd, args = [], cwd, timeout, stdin = "" }) =>
+  new Promise((resolve) => {
+    const startedAt = Date.now();
+    const proc = spawn(cmd, args, { cwd, windowsHide: true });
+
+    let stdout = "";
+    let stderr = "";
+    let timedOut = false;
+
+    const timeoutId = setTimeout(() => {
+      timedOut = true;
+      proc.kill("SIGKILL");
+    }, timeout);
+
+    proc.stdout.on("data", (data) => {
+      if (stdout.length < MAX_OUTPUT_SIZE) {
+        stdout += data.toString();
+      }
+    });
+
+    proc.stderr.on("data", (data) => {
+      if (stderr.length < MAX_OUTPUT_SIZE) {
+        stderr += data.toString();
+      }
+    });
+
+    proc.on("error", (error) => {
+      clearTimeout(timeoutId);
+      resolve({
+        stdout: "",
+        stderr: truncateOutput(error.message),
+        executionTime: Date.now() - startedAt,
+        exitCode: 1,
+        timedOut: false,
+      });
+    });
+
+    proc.on("close", (exitCode) => {
+      clearTimeout(timeoutId);
+      resolve({
+        stdout: truncateOutput(stdout),
+        stderr: truncateOutput(stderr),
+        executionTime: Date.now() - startedAt,
+        exitCode,
+        timedOut,
+      });
+    });
+
+    if (stdin) {
+      proc.stdin.write(stdin);
+    }
+    proc.stdin.end();
+  });
 
 const runDocker = async ({ language, code, stdin = "" }) => {
   const spec = dockerSpec[language];
@@ -208,83 +259,133 @@ const runLocal = async ({ language, code, stdin = "" }) => {
   const spec = localSpec[language];
   if (!spec) throw new ApiError(400, "Unsupported language");
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "af-local-"));
+  const start = Date.now();
 
   try {
     fs.writeFileSync(path.join(tempDir, spec.file), code, "utf8");
-    const start = Date.now();
 
     // Handle compiled languages: cpp, java, rust
     if (spec.compileArgs) {
-      try {
-        await execFileAsync(spec.cmd, spec.compileArgs, {
-          cwd: tempDir,
-          timeout: localExecutionTimeoutMs,
-          maxBuffer: MAX_OUTPUT_SIZE,
-        });
-      } catch (compileError) {
+      const compileResult = await runCommand({
+        cmd: spec.cmd,
+        args: spec.compileArgs,
+        cwd: tempDir,
+        timeout: localExecutionTimeoutMs,
+      });
+
+      if (compileResult.timedOut) {
         return {
           stdout: "",
-          stderr: truncateOutput(compileError.stderr || compileError.message),
-          executionTime: Date.now() - start,
+          stderr: "Compilation timed out",
+          executionTime: compileResult.executionTime,
+          compilationError: true,
+        };
+      }
+
+      if (compileResult.exitCode !== 0 || compileResult.stderr) {
+        return {
+          stdout: "",
+          stderr: compileResult.stderr || "Compilation failed",
+          executionTime: compileResult.executionTime,
           compilationError: true,
         };
       }
 
       // Java needs special handling (java Main instead of ./main.exe)
       if (language === "java") {
-        const run = await execFileAsync(spec.runCmd, spec.runArgs, {
+        const run = await runCommand({
+          cmd: spec.runCmd,
+          args: spec.runArgs,
           cwd: tempDir,
           timeout: localExecutionTimeoutMs,
-          input: stdin,
-          maxBuffer: MAX_OUTPUT_SIZE,
+          stdin,
         });
+
+        if (run.timedOut) {
+          return {
+            stdout: truncateOutput(run.stdout),
+            stderr: "Time Limit Exceeded",
+            executionTime: run.executionTime,
+            timedOut: true,
+            exitCode: run.exitCode,
+          };
+        }
+
         return {
-          stdout: truncateOutput(run.stdout),
-          stderr: truncateOutput(run.stderr),
+          stdout: run.stdout,
+          stderr: run.stderr,
           executionTime: Date.now() - start,
+          exitCode: run.exitCode,
         };
       }
 
       // C++ and Rust use cmd /c to run the executable
-      const run = await execFileAsync("cmd", ["/c", spec.runCmd], {
+      const run = await runCommand({
+        cmd: "cmd",
+        args: ["/c", spec.runCmd],
         cwd: tempDir,
         timeout: localExecutionTimeoutMs,
-        input: stdin,
-        maxBuffer: MAX_OUTPUT_SIZE,
+        stdin,
       });
+
+      if (run.timedOut) {
+        return {
+          stdout: truncateOutput(run.stdout),
+          stderr: "Time Limit Exceeded",
+          executionTime: run.executionTime,
+          timedOut: true,
+          exitCode: run.exitCode,
+        };
+      }
+
       return {
-        stdout: truncateOutput(run.stdout),
-        stderr: truncateOutput(run.stderr),
+        stdout: run.stdout,
+        stderr: run.stderr,
         executionTime: Date.now() - start,
+        exitCode: run.exitCode,
       };
     }
 
     // Interpreted languages: python, javascript, go, typescript
-    const result = await execFileAsync(spec.cmd, spec.args, {
+    const result = await runCommand({
+      cmd: spec.cmd,
+      args: spec.args,
       cwd: tempDir,
       timeout: localExecutionTimeoutMs,
-      input: stdin,
-      maxBuffer: MAX_OUTPUT_SIZE,
+      stdin,
     });
+
+    if (result.timedOut) {
+      return {
+        stdout: truncateOutput(result.stdout),
+        stderr: "Time Limit Exceeded",
+        executionTime: result.executionTime,
+        timedOut: true,
+        exitCode: result.exitCode,
+      };
+    }
+
     return {
-      stdout: truncateOutput(result.stdout),
-      stderr: truncateOutput(result.stderr),
+      stdout: result.stdout,
+      stderr: result.stderr,
       executionTime: Date.now() - start,
+      exitCode: result.exitCode,
     };
   } catch (error) {
-    const executionTime = Date.now() - Date.now();
+    const executionTime = Date.now() - start;
     if (isTimeoutError(error)) {
       return {
         stdout: truncateOutput(error.stdout),
         stderr: "Time Limit Exceeded",
-        executionTime: localExecutionTimeoutMs,
+        executionTime,
         timedOut: true,
       };
     }
     return {
       stdout: truncateOutput(error.stdout),
       stderr: truncateOutput(error.stderr || error.message),
-      executionTime: localExecutionTimeoutMs,
+      executionTime,
+      exitCode: error.code || 1,
     };
   } finally {
     try {
