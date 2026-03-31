@@ -7,6 +7,7 @@ const testCaseSchema = z.object({
 });
 
 const createProblemSchema = z.object({
+  questionNumber: z.number().int().positive().optional(),
   title: z.string().min(3).max(200),
   slug: z.string().min(3).max(220).optional(),
   description: z.string().min(10),

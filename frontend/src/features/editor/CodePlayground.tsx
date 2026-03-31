@@ -9,7 +9,6 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  Terminal,
   AlertTriangle,
   Send,
   FlaskConical,
@@ -105,27 +104,26 @@ export default function CodePlayground({
   const monacoLang = languages.find((l) => l.value === language)?.monaco || language;
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between gap-3 rounded-t-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] px-4 py-3">
-        <div className="flex items-center gap-1 overflow-x-auto">
-          {languages.map((lang) => (
-            <button
-              key={lang.value}
-              onClick={() => setLanguage(lang.value)}
-              className={clsx(
-                "flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors whitespace-nowrap",
-                language === lang.value
-                  ? "bg-[var(--accent-primary)]/20 text-[var(--accent-secondary)]"
-                  : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
-              )}
-            >
-              <span className="hidden lg:inline">{lang.label}</span>
-              <span className="lg:hidden">{lang.icon}</span>
-            </button>
-          ))}
+    <div className="flex h-full min-w-0 flex-col">
+      <div className="flex flex-wrap items-start justify-between gap-3 rounded-t-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] px-4 py-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <label className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
+            Language
+          </label>
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            className="input select h-9 min-w-[150px] max-w-full py-1"
+          >
+            {languages.map((lang) => (
+              <option key={lang.value} value={lang.value}>
+                {lang.label}
+              </option>
+            ))}
+          </select>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <button
             onClick={handleReset}
             className="btn btn-ghost p-2"
@@ -136,7 +134,7 @@ export default function CodePlayground({
           <button
             onClick={onRun}
             disabled={running || submitting}
-            className="btn btn-secondary"
+            className="btn btn-secondary whitespace-nowrap"
           >
             {running ? (
               <>
@@ -153,7 +151,7 @@ export default function CodePlayground({
           <button
             onClick={onSubmit}
             disabled={submitting || running}
-            className="btn btn-success"
+            className="btn btn-success whitespace-nowrap"
           >
             {submitting ? (
               <>
@@ -194,7 +192,7 @@ export default function CodePlayground({
       </div>
 
       <div className="rounded-b-xl border border-t-0 border-[var(--border-color)] bg-[var(--bg-secondary)]">
-        <div className="flex items-center gap-2 border-b border-[var(--border-color)] px-4 py-2">
+        <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border-color)] px-4 py-2">
           <button
             onClick={() => setActiveTestTab("samples")}
             className={clsx(

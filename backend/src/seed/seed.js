@@ -224,6 +224,61 @@ const problemsData = [
 
 const submissionCode = `import sys\nprint(sys.stdin.read().strip())`;
 
+const TARGET_HIDDEN_CASES = 100;
+
+const dedupeCases = (cases = []) => {
+  const seen = new Set();
+  const unique = [];
+
+  for (const tc of cases) {
+    const key = `${tc.input || ""}||${tc.expectedOutput || ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push({ input: tc.input || "", expectedOutput: tc.expectedOutput || "" });
+  }
+
+  return unique;
+};
+
+const ensureSampleCases = (sampleCases = [], fallbackCases = []) => {
+  const base = dedupeCases([...sampleCases, ...fallbackCases]);
+  if (base.length === 0) {
+    return [
+      { input: "", expectedOutput: "" },
+      { input: "", expectedOutput: "" },
+      { input: "", expectedOutput: "" },
+    ];
+  }
+
+  const out = base.slice(0, 3);
+  while (out.length < 3) {
+    out.push(base[out.length % base.length]);
+  }
+  return out;
+};
+
+const buildHiddenCases = (cases = [], target = TARGET_HIDDEN_CASES) => {
+  const base = dedupeCases(cases);
+  if (base.length === 0) return [];
+
+  const out = [];
+  for (let i = 0; i < target; i += 1) {
+    out.push(base[i % base.length]);
+  }
+  return out;
+};
+
+const buildConstraints = (problem) => {
+  if (problem.constraints) return problem.constraints;
+
+  return [
+    "1 <= input size <= 100000",
+    "-10^9 <= value <= 10^9",
+    "Expected time complexity: O(n log n) or better when possible",
+    "Output format must exactly match the sample output",
+  ].join("\n");
+};
+
 const run = async () => {
   await connectDb();
 
@@ -242,7 +297,21 @@ const run = async () => {
   const bob = await User.create(usersData[2]);
   const users = [admin, alice, bob];
 
-  const problems = await Problem.insertMany(problemsData);
+  const preparedProblems = problemsData.map((problem, index) => {
+    const sampleTestCases = ensureSampleCases(problem.sampleTestCases, problem.testCases);
+    const hiddenTestCases = buildHiddenCases(problem.testCases, TARGET_HIDDEN_CASES);
+
+    return {
+      ...problem,
+      questionNumber: index + 1,
+      constraints: buildConstraints(problem),
+      sampleTestCases,
+      testCases: hiddenTestCases,
+      hiddenTestCaseCount: hiddenTestCases.length,
+    };
+  });
+
+  const problems = await Problem.insertMany(preparedProblems);
 
   // Create multiple contests with different states
   const liveContest = await Contest.create({

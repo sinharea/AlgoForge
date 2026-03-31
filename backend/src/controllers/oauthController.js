@@ -35,6 +35,7 @@ if (googleClientId && googleClientSecret) {
             name: profile.displayName,
             provider: AUTH_PROVIDER.GOOGLE,
             oauthId: profile.id,
+            avatarUrl: profile.photos?.[0]?.value,
           });
           done(null, data);
         } catch (error) {
@@ -65,6 +66,7 @@ if (githubClientId && githubClientSecret) {
             name: profile.displayName || profile.username,
             provider: AUTH_PROVIDER.GITHUB,
             oauthId: profile.id,
+            avatarUrl: profile.photos?.[0]?.value,
           });
           done(null, data);
         } catch (error) {
@@ -76,16 +78,65 @@ if (githubClientId && githubClientSecret) {
 }
 
 const oauthCallback = (req, res) => {
-  const { accessToken, refreshToken, user } = req.user;
+  const { accessToken, refreshToken, user } = req.user || {};
+
+  if (!accessToken || !refreshToken || !user) {
+    const redirect = `${frontendUrl}/oauth/callback?error=${encodeURIComponent("OAuth callback failed")}`;
+    return res.redirect(redirect);
+  }
+
   const redirect = `${frontendUrl}/oauth/callback?accessToken=${encodeURIComponent(
     accessToken
   )}&refreshToken=${encodeURIComponent(refreshToken)}&email=${encodeURIComponent(
-    user.email
+    user.email || ""
+  )}&name=${encodeURIComponent(user.name || "")}&id=${encodeURIComponent(
+    user.id || ""
+  )}&role=${encodeURIComponent(user.role || "user")}&avatarUrl=${encodeURIComponent(
+    user.avatarUrl || ""
   )}`;
-  res.redirect(redirect);
+
+  return res.redirect(redirect);
+};
+
+const isStrategyEnabled = (provider) => {
+  try {
+    return Boolean(passport._strategy(provider));
+  } catch {
+    return false;
+  }
+};
+
+const oauthErrorRedirect = (res, message) => {
+  const redirect = `${frontendUrl}/oauth/callback?error=${encodeURIComponent(message)}`;
+  return res.redirect(redirect);
+};
+
+const startOAuth = (provider, options = {}) => (req, res, next) => {
+  if (!isStrategyEnabled(provider)) {
+    return oauthErrorRedirect(res, `${provider} OAuth is not configured`);
+  }
+
+  return passport.authenticate(provider, options)(req, res, next);
+};
+
+const finishOAuth = (provider) => (req, res, next) => {
+  if (!isStrategyEnabled(provider)) {
+    return oauthErrorRedirect(res, `${provider} OAuth is not configured`);
+  }
+
+  return passport.authenticate(provider, { session: false }, (err, userPayload) => {
+    if (err || !userPayload) {
+      return oauthErrorRedirect(res, err?.message || "OAuth authentication failed");
+    }
+    req.user = userPayload;
+    return oauthCallback(req, res);
+  })(req, res, next);
 };
 
 module.exports = {
   passport,
   oauthCallback,
+  startOAuth,
+  finishOAuth,
+  isStrategyEnabled,
 };

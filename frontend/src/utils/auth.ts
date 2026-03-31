@@ -1,6 +1,6 @@
 "use client";
 
-type User = { id: string; name: string; email: string; role: string };
+type User = { id: string; name: string; email: string; role: string; avatarUrl?: string };
 
 const ACCESS = "af_access_token";
 const REFRESH = "af_refresh_token";

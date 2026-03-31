@@ -147,6 +147,9 @@ export default function ProblemsPage() {
                   Status
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
+                  #
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
                   Title
                 </th>
                 <th className="hidden px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)] md:table-cell">
@@ -170,6 +173,9 @@ export default function ProblemsPage() {
                   <td className="px-4 py-4">
                     <Circle className="h-5 w-5 text-[var(--text-muted)]" />
                   </td>
+                  <td className="px-4 py-4 text-sm font-mono text-[var(--text-secondary)]">
+                    {problem.questionNumber || "-"}
+                  </td>
                   <td className="px-4 py-4">
                     <Link
                       href={`/problems/${problem.slug}`}
@@ -177,6 +183,11 @@ export default function ProblemsPage() {
                     >
                       {problem.title}
                     </Link>
+                    {problem.hiddenTestCaseCount ? (
+                      <div className="mt-1 text-xs text-[var(--text-muted)]">
+                        {problem.hiddenTestCaseCount} hidden tests
+                      </div>
+                    ) : null}
                   </td>
                   <td className="hidden px-4 py-4 md:table-cell">
                     <div className="flex flex-wrap gap-1">

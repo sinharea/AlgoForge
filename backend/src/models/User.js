@@ -38,6 +38,11 @@ const userSchema = new mongoose.Schema({
   oauthId: {
     type: String,
   },
+  avatarUrl: {
+    type: String,
+    trim: true,
+    default: "",
+  },
   refreshTokenHash: {
     type: String,
     select: false,

@@ -2,6 +2,10 @@ const mongoose = require("mongoose");
 const { DIFFICULTY } = require("../constants");
 
 const problemSchema = new mongoose.Schema({
+  questionNumber: {
+    type: Number,
+    min: 1,
+  },
   title: {
     type: String,
     required: true,
@@ -29,7 +33,7 @@ const problemSchema = new mongoose.Schema({
   testCases: [
     {
       input: String,
-      expectedOutput: String
+      expectedOutput: String  
     }
   ],
 
@@ -39,6 +43,12 @@ const problemSchema = new mongoose.Schema({
       expectedOutput: String
     }
   ],
+
+  hiddenTestCaseCount: {
+    type: Number,
+    default: 0,
+    min: 0,
+  },
 
   timeLimit: {
     type: Number,
@@ -53,5 +63,6 @@ const problemSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 problemSchema.index({ title: "text", description: "text", tags: "text" });
+problemSchema.index({ questionNumber: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model("Problem", problemSchema);

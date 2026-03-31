@@ -28,6 +28,21 @@ const verifyEmailSchema = z.object({
   token: z.string().min(10),
 });
 
+const updateProfileSchema = z
+  .object({
+    name: z.string().min(2).max(80).optional(),
+    avatarUrl: z
+      .string()
+      .max(500)
+      .optional()
+      .refine((value) => !value || /^https?:\/\//i.test(value), {
+        message: "avatarUrl must be a valid http(s) URL",
+      }),
+  })
+  .refine((value) => value.name !== undefined || value.avatarUrl !== undefined, {
+    message: "At least one field is required",
+  });
+
 module.exports = {
   registerSchema,
   loginSchema,
@@ -35,4 +50,5 @@ module.exports = {
   forgotPasswordSchema,
   resetPasswordSchema,
   verifyEmailSchema,
+  updateProfileSchema,
 };

@@ -1,15 +1,16 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
-import { getUser, getAccessToken, setAuthTokens, clearAuth } from "../utils/auth";
+import { getUser, getAccessToken, getRefreshToken, setAuthTokens, clearAuth } from "../utils/auth";
 
-type User = { id: string; name: string; email: string; role: string } | null;
+type User = { id: string; name: string; email: string; role: string; avatarUrl?: string } | null;
 
 type AuthContextType = {
   user: User;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (accessToken: string, refreshToken: string, user: NonNullable<User>) => void;
+  updateUser: (user: NonNullable<User>) => void;
   logout: () => void;
 };
 
@@ -33,6 +34,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(userData);
   }, []);
 
+  const updateUser = useCallback((userData: NonNullable<User>) => {
+    const access = getAccessToken();
+    const refresh = getRefreshToken();
+    if (access && refresh) {
+      setAuthTokens(access, refresh, userData);
+    }
+    setUser(userData);
+  }, []);
+
   const logout = useCallback(() => {
     clearAuth();
     setUser(null);
@@ -45,6 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!user,
         isLoading,
         login,
+        updateUser,
         logout,
       }}
     >

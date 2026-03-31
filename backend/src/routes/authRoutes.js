@@ -8,8 +8,10 @@ const {
   forgotPassword,
   resetPassword,
   verifyEmail,
+  me,
+  updateMe,
 } = require("../controllers/authController");
-const { passport, oauthCallback } = require("../controllers/oauthController");
+const { startOAuth, finishOAuth } = require("../controllers/oauthController");
 const validate = require("../middleware/validate");
 const auth = require("../middleware/auth");
 const { authLimiter, loginLimiter } = require("../middleware/rateLimiter");
@@ -20,6 +22,7 @@ const {
   forgotPasswordSchema,
   resetPasswordSchema,
   verifyEmailSchema,
+  updateProfileSchema,
 } = require("../validators/authValidator");
 
 // Apply general auth rate limiter to all routes
@@ -32,19 +35,13 @@ router.post("/logout", auth, logout);
 router.post("/forgot-password", loginLimiter, validate(forgotPasswordSchema), forgotPassword); // Extra strict for password reset
 router.post("/reset-password", validate(resetPasswordSchema), resetPassword);
 router.post("/verify-email", validate(verifyEmailSchema), verifyEmail);
+router.get("/me", auth, me);
+router.patch("/me", auth, validate(updateProfileSchema), updateMe);
 
-router.get("/oauth/google", passport.authenticate("google", { scope: ["profile", "email"] }));
-router.get(
-  "/oauth/google/callback",
-  passport.authenticate("google", { session: false }),
-  oauthCallback
-);
+router.get("/oauth/google", startOAuth("google", { scope: ["profile", "email"] }));
+router.get("/oauth/google/callback", finishOAuth("google"));
 
-router.get("/oauth/github", passport.authenticate("github", { scope: ["user:email"] }));
-router.get(
-  "/oauth/github/callback",
-  passport.authenticate("github", { session: false }),
-  oauthCallback
-);
+router.get("/oauth/github", startOAuth("github", { scope: ["user:email"] }));
+router.get("/oauth/github/callback", finishOAuth("github"));
 
 module.exports = router;

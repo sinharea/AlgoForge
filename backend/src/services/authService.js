@@ -19,6 +19,7 @@ const sanitizeUser = (user) => ({
   role: user.role,
   provider: user.provider,
   isEmailVerified: user.isEmailVerified,
+  avatarUrl: user.avatarUrl || "",
 });
 
 const issueTokensForUser = async (user) => {
@@ -136,7 +137,7 @@ const verifyEmail = async ({ token }) => {
   await user.save();
 };
 
-const upsertOAuthUser = async ({ email, name, provider, oauthId }) => {
+const upsertOAuthUser = async ({ email, name, provider, oauthId, avatarUrl }) => {
   let user = await User.findOne({ email: email.toLowerCase() });
 
   if (!user) {
@@ -145,17 +146,44 @@ const upsertOAuthUser = async ({ email, name, provider, oauthId }) => {
       name: name || slugify(email.split("@")[0], { lower: false }),
       provider,
       oauthId,
+      avatarUrl: avatarUrl || "",
       isEmailVerified: true,
     });
   } else if (!user.oauthId) {
     user.provider = provider;
     user.oauthId = oauthId;
     user.isEmailVerified = true;
+    if (avatarUrl) user.avatarUrl = avatarUrl;
+    await user.save();
+  } else if (avatarUrl && !user.avatarUrl) {
+    user.avatarUrl = avatarUrl;
     await user.save();
   }
 
   const tokens = await issueTokensForUser(user);
   return { user: sanitizeUser(user), ...tokens };
+};
+
+const getMyProfile = async ({ userId }) => {
+  const user = await User.findById(userId);
+  if (!user) throw new ApiError(404, "User not found");
+  return sanitizeUser(user);
+};
+
+const updateMyProfile = async ({ userId, name, avatarUrl }) => {
+  const user = await User.findById(userId);
+  if (!user) throw new ApiError(404, "User not found");
+
+  if (typeof name === "string") {
+    user.name = name.trim();
+  }
+
+  if (typeof avatarUrl === "string") {
+    user.avatarUrl = avatarUrl.trim();
+  }
+
+  await user.save();
+  return sanitizeUser(user);
 };
 
 module.exports = {
@@ -167,4 +195,6 @@ module.exports = {
   resetPassword,
   verifyEmail,
   upsertOAuthUser,
+  getMyProfile,
+  updateMyProfile,
 };

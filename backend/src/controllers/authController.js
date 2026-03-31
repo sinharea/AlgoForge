@@ -7,6 +7,8 @@ const {
   requestPasswordReset,
   resetPassword,
   verifyEmail,
+  getMyProfile,
+  updateMyProfile,
 } = require("../services/authService");
 
 const register = asyncHandler(async (req, res) => {
@@ -44,6 +46,16 @@ const verifyEmailHandler = asyncHandler(async (req, res) => {
   res.json({ message: "Email verified successfully" });
 });
 
+const me = asyncHandler(async (req, res) => {
+  const user = await getMyProfile({ userId: req.user._id });
+  res.json({ user });
+});
+
+const updateMe = asyncHandler(async (req, res) => {
+  const user = await updateMyProfile({ userId: req.user._id, ...req.body });
+  res.json({ user });
+});
+
 module.exports = {
   register,
   login,
@@ -52,4 +64,6 @@ module.exports = {
   forgotPassword,
   resetPassword: resetPasswordHandler,
   verifyEmail: verifyEmailHandler,
+  me,
+  updateMe,
 };

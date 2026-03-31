@@ -42,12 +42,12 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-50 border-b border-[var(--border-color)] glass">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
-        <div className="flex items-center gap-8">
+        <div className="flex items-center gap-4 lg:gap-8">
           <Link href="/" className="flex items-center gap-2 text-xl font-bold">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-purple-600">
               <Code2 className="h-5 w-5 text-white" />
             </div>
-            <span className="gradient-text">AlgoForge</span>
+            <span className="hidden gradient-text sm:inline">AlgoForge</span>
           </Link>
 
           <nav className="hidden items-center gap-1 md:flex">
@@ -80,9 +80,17 @@ export default function Header() {
                 onClick={() => setDropdownOpen(!dropdownOpen)}
                 className="flex items-center gap-2 rounded-lg bg-[var(--bg-tertiary)] px-3 py-2 text-sm font-medium transition-colors hover:bg-[var(--bg-elevated)]"
               >
-                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-purple-600 text-xs font-semibold text-white">
-                  {user?.name?.charAt(0).toUpperCase()}
-                </div>
+                {user?.avatarUrl ? (
+                  <img
+                    src={user.avatarUrl}
+                    alt={user.name}
+                    className="h-7 w-7 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-purple-600 text-xs font-semibold text-white">
+                    {user?.name?.charAt(0).toUpperCase()}
+                  </div>
+                )}
                 <span className="max-w-[100px] truncate">{user?.name}</span>
                 <ChevronDown className={clsx("h-4 w-4 transition-transform", dropdownOpen && "rotate-180")} />
               </button>
@@ -100,6 +108,14 @@ export default function Header() {
                   >
                     <User className="h-4 w-4" />
                     Dashboard
+                  </Link>
+                  <Link
+                    href="/profile"
+                    onClick={() => setDropdownOpen(false)}
+                    className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+                  >
+                    <User className="h-4 w-4" />
+                    Edit profile
                   </Link>
                   <button
                     onClick={() => {
@@ -168,14 +184,30 @@ export default function Header() {
               {isAuthenticated ? (
                 <>
                   <div className="mb-3 flex items-center gap-3 px-4">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-purple-600 font-semibold text-white">
-                      {user?.name?.charAt(0).toUpperCase()}
-                    </div>
+                    {user?.avatarUrl ? (
+                      <img
+                        src={user.avatarUrl}
+                        alt={user.name}
+                        className="h-10 w-10 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-purple-600 font-semibold text-white">
+                        {user?.name?.charAt(0).toUpperCase()}
+                      </div>
+                    )}
                     <div>
                       <p className="font-medium">{user?.name}</p>
                       <p className="text-xs text-[var(--text-muted)]">{user?.email}</p>
                     </div>
                   </div>
+                  <Link
+                    href="/profile"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="mb-2 flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)]"
+                  >
+                    <User className="h-5 w-5" />
+                    Edit profile
+                  </Link>
                   <button
                     onClick={() => {
                       logout();

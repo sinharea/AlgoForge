@@ -13,10 +13,10 @@ const getAllProblems = asyncHandler(async (req, res) => {
 
   const [items, total] = await Promise.all([
     Problem.find(filter)
-      .select("title slug difficulty tags")
+      .select("questionNumber title slug difficulty tags hiddenTestCaseCount")
       .skip((page - 1) * limit)
       .limit(limit)
-      .sort({ createdAt: -1 }),
+      .sort({ questionNumber: 1, createdAt: -1 }),
     Problem.countDocuments(filter),
   ]);
 
