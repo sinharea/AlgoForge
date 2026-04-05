@@ -19,7 +19,7 @@ export function getContestEndTime(contest: ContestTiming): number {
   }
   return contest.startTime + contest.duration * MINUTE;
 }
- 
+
 export function getContestStatus(
   contest: ContestTiming,
   now = Date.now()
