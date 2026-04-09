@@ -397,8 +397,9 @@ const createReport = async ({ userId, targetId, reason }) => {
   return Report.create({
     userId,
     targetId,
+    targetType: post ? "post" : "comment",
     reason,
-    status: "open",
+    status: "pending",
   });
 };
 

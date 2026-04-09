@@ -30,6 +30,12 @@ const userSchema = new mongoose.Schema({
     enum: Object.values(USER_ROLES),
     default: USER_ROLES.USER,
   },
+  status: {
+    type: String,
+    enum: ["active", "banned"],
+    default: "active",
+    index: true,
+  },
   provider: {
     type: String,
     enum: Object.values(AUTH_PROVIDER),
@@ -78,6 +84,8 @@ const userSchema = new mongoose.Schema({
 
 userSchema.pre("save", async function () {
   if (!this.isModified("password") || !this.password) return;
+  // Allow controlled scripts to provide an already-hashed bcrypt password.
+  if (/^\$2[aby]\$\d{2}\$/.test(this.password)) return;
   this.password = await bcrypt.hash(this.password, 12);
 });
 

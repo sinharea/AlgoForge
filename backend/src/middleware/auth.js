@@ -25,6 +25,10 @@ const auth = asyncHandler(async (req, res, next) => {
     throw new ApiError(401, "User not found");
   }
 
+  if (user.status === "banned") {
+    throw new ApiError(403, "Your account is banned");
+  }
+
   req.user = user;
   next();
 });

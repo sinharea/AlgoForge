@@ -6,6 +6,7 @@ const submissionRoutes = require("./submissionRoutes");
 const contestRoutes = require("./contestRoutes");
 const recommendationRoutes = require("./recommendationRoutes");
 const communityRoutes = require("./communityRoutes");
+const adminRoutes = require("./adminRoutes");
 
 const router = express.Router();
 
@@ -15,5 +16,6 @@ router.use("/submissions", submissionRoutes);
 router.use("/contests", contestRoutes);
 router.use("/recommendations", recommendationRoutes);
 router.use("/", communityRoutes);
+router.use("/admin", adminRoutes);
 
 module.exports = router;

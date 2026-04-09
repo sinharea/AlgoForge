@@ -66,7 +66,11 @@ const loginUser = async ({ email, password }) => {
   if (!isValid) throw new ApiError(401, "Invalid credentials");
 
   const tokens = await issueTokensForUser(user);
-  return { user: sanitizeUser(user), ...tokens };
+  return {
+    token: tokens.accessToken,
+    user: sanitizeUser(user),
+    ...tokens,
+  };
 };
 
 const refreshSession = async ({ refreshToken }) => {

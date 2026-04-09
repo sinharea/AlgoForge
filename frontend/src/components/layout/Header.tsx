@@ -9,6 +9,7 @@ import {
   Code2,
   LayoutDashboard,
   Trophy,
+  Shield,
   User,
   LogOut,
   ChevronDown,
@@ -17,7 +18,7 @@ import {
 } from "lucide-react";
 import { useAuthContext } from "@/src/context/AuthContext";
 
-const navItems = [
+const baseNavItems = [
   { href: "/problems", label: "Problems", icon: Code2 },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/contests", label: "Contests", icon: Trophy },
@@ -26,6 +27,10 @@ const navItems = [
 export default function Header() {
   const pathname = usePathname();
   const { user, isAuthenticated, logout } = useAuthContext();
+  const navItems =
+    user?.role === "admin"
+      ? [...baseNavItems, { href: "/admin/dashboard", label: "Admin", icon: Shield }]
+      : baseNavItems;
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);

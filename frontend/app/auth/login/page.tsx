@@ -37,7 +37,7 @@ export default function LoginPage() {
       const { data } = await authApi.login({ email, password });
       login(data.accessToken, data.refreshToken, data.user);
       toast.success("Welcome back!");
-      router.push("/problems");
+      router.push(data?.user?.role === "admin" ? "/admin/dashboard" : "/problems");
     } catch (error: any) {
       toast.error(error?.response?.data?.message || "Login failed");
     } finally {
