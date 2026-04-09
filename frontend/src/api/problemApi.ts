@@ -16,6 +16,7 @@ export interface RunResult {
 
 export const problemApi = {
   list: (params: Record<string, unknown>) => api.get("/problems", { params }),
+  getById: (id: string) => api.get(`/problems/${id}`),
   getBySlug: (slug: string) => api.get(`/problems/slug/${slug}`),
   submit: (payload: { problemId: string; language: string; code: string; contestId?: string }) =>
     api.post("/submissions", payload),

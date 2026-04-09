@@ -69,6 +69,11 @@ const userSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  reputation: {
+    type: Number,
+    default: 0,
+    index: true,
+  },
 }, { timestamps: true });
 
 userSchema.pre("save", async function () {

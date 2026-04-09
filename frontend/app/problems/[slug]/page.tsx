@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useParams, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import toast from "react-hot-toast";
 import { clsx } from "clsx";
@@ -356,7 +357,15 @@ export default function ProblemDetailPage() {
                       <Hash className="h-3 w-3" />
                       Problem {problem.questionNumber || "-"}
                     </div>
-                    <h1 className="text-2xl font-bold">{problem.title}</h1>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <h1 className="text-2xl font-bold">{problem.title}</h1>
+                      <Link
+                        href={`/problems/${slug}/discuss`}
+                        className="rounded-full border border-[var(--border-color)] bg-[var(--bg-tertiary)] px-3 py-1 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:border-[var(--accent-primary)] hover:text-[var(--accent-secondary)]"
+                      >
+                        💬 Discussions
+                      </Link>
+                    </div>
                   </div>
                   <DifficultyBadge difficulty={problem.difficulty} />
                 </div>
@@ -745,6 +754,7 @@ export default function ProblemDetailPage() {
                   )}
                 </div>
               )}
+
             </div>
           </div>
         </div>
