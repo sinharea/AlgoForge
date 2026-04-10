@@ -8,6 +8,7 @@ const {
 
 const STUCK_PATTERN = /\b(stuck|hint|help|confused|no idea|don't know|dont know|unclear)\b/i;
 const NO_ANSWER_PATTERN = /\b(idk|i don't know|dont know|no idea|not sure|skip|pass)\b/i;
+const END_SIGNAL_PATTERN = /^(no|nope|that's all|thats all|nothing else)$/i;
 const INTERVIEW_STAGES = ["approach", "complexity", "edge_cases", "optimization", "coding"];
 
 const APPROACH_PATTERN = /\b(hash|map|set|array|two[-\s]?pointer|sliding\s+window|binary\s+search|dp|dynamic\s+programming|greedy|stack|queue|graph|tree|sort|prefix|backtrack|brute)\b/i;
@@ -31,7 +32,7 @@ const REACTION_BY_ASSESSMENT = {
   correct: "yeah, that makes sense.",
   partial: "you're close, think about this:",
   wrong: "hmm, not exactly...",
-  no_answer: "that's okay, let's think about it together.",
+  no_answer: "that's okay, let's think about it.",
 };
 
 const trimText = (value = "", max = 1200) => {
@@ -90,8 +91,19 @@ const ensureReactionPrefix = (message, assessment) => {
   return `${REACTION_BY_ASSESSMENT[assessment] || REACTION_BY_ASSESSMENT.partial} ${text}`;
 };
 
-const stageFallbackQuestion = (stage, assessment = "partial", struggleCount = 0) => {
+const stageFallbackQuestion = (stage, assessment = "partial", struggleCount = 0, isEndSignal = false) => {
   const reaction = REACTION_BY_ASSESSMENT[assessment] || REACTION_BY_ASSESSMENT.partial;
+
+  if (isEndSignal && struggleCount < 1) {
+    const challenge = {
+      approach: "quick one: what core idea would you still try first?",
+      complexity: "quick check: what complexity do you expect here?",
+      edge_cases: "quick check: what tricky case comes to mind first?",
+      optimization: "quick check: any optimization you would test?",
+      coding: "quick check: how would you structure the code?",
+    };
+    return `${reaction} ${challenge[normalizeStage(stage)] || challenge.approach}`;
+  }
 
   if (struggleCount === 1) {
     return `${reaction} small hint: focus on the key invariant in your approach.`;
@@ -179,6 +191,7 @@ const startInterviewSession = async ({ userId, problemId }) => {
     phase: "active",
     hintsGiven: 0,
     stuckCount: 0,
+    struggleCount: 0,
     userStuck: false,
     turn: 1,
     lastInterviewerQuestion: "",
@@ -192,7 +205,6 @@ const startInterviewSession = async ({ userId, problemId }) => {
     currentStage,
     struggleCount: 0,
     answerAssessment: "no_answer",
-    currentState,
     isSessionStart: true,
   });
 
@@ -245,16 +257,19 @@ const respondInterviewSession = async ({ userId, sessionId, userMessage }) => {
     stage: resolvedCurrentStage,
     userMessage: normalizedMessage,
   });
+  const isEndSignal = END_SIGNAL_PATTERN.test(normalizedMessage.toLowerCase());
 
   const messageSignalsStuck = STUCK_PATTERN.test(normalizedMessage);
   const isStruggleResponse =
     messageSignalsStuck || answerAssessment === "wrong" || answerAssessment === "no_answer";
 
   let nextStuckCount = isStruggleResponse
-    ? (session.currentState?.stuckCount || 0) + 1
-    : Math.max(0, (session.currentState?.stuckCount || 0) - 1);
+    ? (session.currentState?.struggleCount ?? session.currentState?.stuckCount ?? 0) + 1
+    : Math.max(0, (session.currentState?.struggleCount ?? session.currentState?.stuckCount ?? 0) - 1);
 
-  const forceMoveForward = isStruggleResponse && nextStuckCount >= 3;
+  const forceMoveForward =
+    (isStruggleResponse && nextStuckCount >= 3) ||
+    (isEndSignal && nextStuckCount >= 1);
   const progressedStage =
     answerAssessment === "correct" || forceMoveForward
       ? nextStage(resolvedCurrentStage)
@@ -274,6 +289,7 @@ const respondInterviewSession = async ({ userId, sessionId, userMessage }) => {
     phase: "active",
     hintsGiven: session.currentState?.hintsGiven || 0,
     stuckCount: nextStuckCount,
+    struggleCount: nextStuckCount,
     userStuck: nextStuckCount >= 2,
     turn: (session.currentState?.turn || 0) + 1,
     lastInterviewerQuestion: session.currentState?.lastInterviewerQuestion || "",
@@ -289,17 +305,12 @@ const respondInterviewSession = async ({ userId, sessionId, userMessage }) => {
 
   const avoidQuestion = recentInterviewerQuestions.join(" || ");
 
-  let interviewerContent = await generateInterviewerMessage({
-    problemStatement: formatProblemStatement(session.problemId),
-    conversationHistory: recentConversation,
-    currentStage: progressedStage,
-    struggleCount: nextStuckCount,
-    answerAssessment,
-    avoidQuestion,
-    currentState: draftState,
-  });
+  const mustForceHint = nextStuckCount >= 2 && progressedStage === resolvedCurrentStage;
+  let interviewerContent;
 
-  if (isTooSimilarToAny(interviewerContent, recentInterviewerQuestions)) {
+  if (mustForceHint) {
+    interviewerContent = stageFallbackQuestion(progressedStage, answerAssessment, nextStuckCount, isEndSignal);
+  } else {
     interviewerContent = await generateInterviewerMessage({
       problemStatement: formatProblemStatement(session.problemId),
       conversationHistory: recentConversation,
@@ -307,13 +318,23 @@ const respondInterviewSession = async ({ userId, sessionId, userMessage }) => {
       struggleCount: nextStuckCount,
       answerAssessment,
       avoidQuestion,
-      currentState: draftState,
+    });
+  }
+
+  if (!mustForceHint && isTooSimilarToAny(interviewerContent, recentInterviewerQuestions)) {
+    interviewerContent = await generateInterviewerMessage({
+      problemStatement: formatProblemStatement(session.problemId),
+      conversationHistory: recentConversation,
+      currentStage: progressedStage,
+      struggleCount: nextStuckCount,
+      answerAssessment,
+      avoidQuestion,
       retryCount: 1,
     });
   }
 
   if (isTooSimilarToAny(interviewerContent, recentInterviewerQuestions)) {
-    interviewerContent = stageFallbackQuestion(progressedStage, answerAssessment, nextStuckCount);
+    interviewerContent = stageFallbackQuestion(progressedStage, answerAssessment, nextStuckCount, isEndSignal);
   }
 
   interviewerContent = ensureReactionPrefix(interviewerContent, answerAssessment);

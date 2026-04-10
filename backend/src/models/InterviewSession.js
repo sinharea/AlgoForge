@@ -49,6 +49,7 @@ const interviewSessionSchema = new mongoose.Schema(
       phase: { type: String, default: "active" },
       hintsGiven: { type: Number, default: 0 },
       stuckCount: { type: Number, default: 0 },
+      struggleCount: { type: Number, default: 0 },
       userStuck: { type: Boolean, default: false },
       turn: { type: Number, default: 0 },
       lastInterviewerQuestion: { type: String, default: "" },

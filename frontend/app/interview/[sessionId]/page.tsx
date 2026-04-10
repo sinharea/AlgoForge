@@ -18,6 +18,7 @@ export default function InterviewPage() {
   const [messages, setMessages] = useState<InterviewMessage[]>([]);
   const [currentStage, setCurrentStage] = useState<"approach" | "complexity" | "edge_cases" | "optimization" | "coding">("approach");
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const lastSpokenInterviewerMessageRef = useRef<string>("");
 
   const stageLabel = {
     approach: "Approach",
@@ -70,6 +71,36 @@ export default function InterviewPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, respondMutation.isPending]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+
+    const lastInterviewerMessage = [...messages]
+      .reverse()
+      .find((message) => message.role === "interviewer");
+
+    if (!lastInterviewerMessage?.content) return;
+
+    const messageKey = `${lastInterviewerMessage.timestamp || ""}:${lastInterviewerMessage.content}`;
+    if (lastSpokenInterviewerMessageRef.current === messageKey) return;
+
+    lastSpokenInterviewerMessageRef.current = messageKey;
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(lastInterviewerMessage.content);
+    utterance.lang = "en-US";
+    utterance.rate = 1;
+    utterance.pitch = 1;
+    window.speechSynthesis.speak(utterance);
+  }, [messages]);
+
+  useEffect(() => {
+    return () => {
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
 
   const problem = sessionQuery.data?.problem;
 
@@ -143,7 +174,7 @@ export default function InterviewPage() {
           {respondMutation.isPending ? (
             <div className="flex justify-start">
               <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-tertiary)] px-3 py-2 text-xs text-[var(--text-muted)]">
-                Interviewer is typing...
+                Interviewer is thinking...
               </div>
             </div>
           ) : null}

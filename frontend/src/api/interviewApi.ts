@@ -19,6 +19,7 @@ export type InterviewSessionResponse = {
   currentState: {
     phase: string;
     hintsGiven: number;
+    struggleCount: number;
     stuckCount: number;
     userStuck: boolean;
     turn: number;

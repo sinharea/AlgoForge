@@ -29,11 +29,15 @@ const buildInterviewerPrompt = ({
   struggleCount,
   answerAssessment,
   avoidQuestion,
-}) => `You are a technical interviewer at a top tech company.
+}) => `You are a senior technical interviewer at a top tech company.
+
+You are conducting a LIVE coding interview.
 
 You are NOT a tutor.
 You are NOT a teacher.
 You are a HUMAN interviewer.
+
+-------------------------------------
 
 Problem:
 ${problemStatement}
@@ -47,80 +51,125 @@ ${currentStage}
 User struggle level:
 ${struggleCount}
 
-User answer quality:
+Current user answer quality:
 ${answerAssessment}
 
-PERSONALITY:
-- Speak naturally like a human
-- Use short conversational phrases:
-  - "hmm"
-  - "okay"
-  - "interesting"
-  - "that makes sense"
-  - "not quite"
-- Do NOT sound robotic or structured
+-------------------------------------
 
-STRICT RULES:
-- NEVER repeat the same question
-- ALWAYS move the conversation forward
-- If user already answered something, acknowledge briefly and continue
+BEHAVIOR:
 
-BEHAVIOR RULES:
-1. React to the user's answer FIRST:
-   - Good answer -> "yeah, that makes sense"
-   - Partial -> "you're close, think about..."
-   - Wrong -> "hmm, not exactly..."
-   - No answer -> "that's okay, let's think about it together"
+1. Speak naturally:
+   - 'hmm', 'okay', 'interesting', 'not quite', 'right'
+   - slightly conversational, not robotic
 
-2. If user struggles:
-   - First: give a SMALL hint
-   - Second: give a clearer hint
-   - Third: move forward
+2. ALWAYS react first:
+   - good -> 'yeah, that makes sense'
+   - partial -> 'you're close...'
+   - wrong -> 'hmm, not exactly...'
+   - no answer -> 'that's okay, let's think about it'
 
-3. DO NOT dump full explanations
+3. NEVER repeat questions.
 
-4. Keep responses SHORT (1-2 lines max)
+4. Ask ONE thing at a time.
 
-Interview Flow (must follow in order):
-1. Approach
-2. Time & Space Complexity
-3. Edge Cases
-4. Optimization
-5. Coding Discussion
+5. Keep responses SHORT (1-2 lines).
 
-Do not explicitly mention stage names.
+-------------------------------------
 
-${avoidQuestion ? `Do not ask this again: ${avoidQuestion}` : ""}
+ADAPTIVE LOGIC:
 
-Output:
-- Only the next interviewer message.`;
+If user struggles:
+- 1st attempt -> small hint
+- 2nd attempt -> clearer hint
+- 3rd attempt -> move forward
+
+If user says:
+- 'no'
+- 'that's all'
+-> challenge lightly OR move forward
+
+-------------------------------------
+
+INTERVIEW FLOW:
+
+Approach -> Complexity -> Edge Cases -> Optimization -> Coding
+
+DO NOT mention stages explicitly.
+
+-------------------------------------
+
+QUESTION STYLE:
+
+Avoid generic robotic wording.
+Use natural prompts like:
+- "hmm... what happens if the input is empty?"
+- "what if there are duplicates?"
+- "does this still work for large inputs?"
+
+${avoidQuestion ? `Do not repeat this question or wording: ${avoidQuestion}` : ""}
+
+-------------------------------------
+
+OUTPUT:
+Return ONLY the next interviewer message.
+No explanations.
+No formatting.`;
+
+const reactionMap = {
+  correct: "yeah, that makes sense.",
+  partial: "you're close, think about this:",
+  wrong: "hmm, not exactly...",
+  no_answer: "that's okay, let's think about it.",
+};
 
 const stageFallbackQuestions = {
   approach: [
     "okay, what approach would you start with here?",
-    "hmm, what core idea are you leaning toward first?",
+    "hmm, what core idea are you going with first?",
   ],
   complexity: [
-    "yeah, that makes sense. what would the time and space complexity look like?",
-    "interesting. can you estimate the Big-O costs here?",
+    "interesting, what does the time and space complexity look like?",
+    "right, what Big-O cost do you expect here?",
   ],
   edge_cases: [
-    "hmm, can you think of tricky cases that might break this?",
-    "okay, what happens on empty input or duplicate-heavy input?",
+    "hmm, what happens if the input is empty?",
+    "okay, what if there are duplicates or very large inputs?",
   ],
   optimization: [
-    "that makes sense. any optimization you'd try if input grows a lot?",
-    "not bad. can we trim memory or runtime further?",
+    "right, can you optimize this further?",
+    "interesting, any trade-off to reduce memory or runtime?",
   ],
   coding: [
-    "okay, walk me through how you'd structure the code.",
-    "interesting. what checks would you keep while implementing?",
+    "okay, how would you structure the code now?",
+    "right, what checks would you keep while implementing?",
   ],
+};
+
+const stageHintPrompts = {
+  approach: {
+    small: "small hint: focus on what data you need at each step.",
+    clear: "clearer hint: think about a structure that gives fast lookup.",
+  },
+  complexity: {
+    small: "small hint: count work per element and extra storage.",
+    clear: "clearer hint: walk through one pass and track memory growth.",
+  },
+  edge_cases: {
+    small: "small hint: try empty, single, duplicate, and large inputs.",
+    clear: "clearer hint: include boundary values and repeated elements.",
+  },
+  optimization: {
+    small: "small hint: check if a different traversal reduces overhead.",
+    clear: "clearer hint: consider trade-offs between memory and passes.",
+  },
+  coding: {
+    small: "small hint: define invariants before writing loops.",
+    clear: "clearer hint: lock down update order and guard conditions first.",
+  },
 };
 
 const fallbackInterviewerMessage = ({
   isSessionStart,
-  currentState,
   currentStage = "approach",
   struggleCount = 0,
   answerAssessment = "partial",
@@ -128,39 +177,34 @@ const fallbackInterviewerMessage = ({
   retryCount = 0,
 }) => {
   const stage = stageFallbackQuestions[currentStage] ? currentStage : "approach";
-  const stagePrompts = stageFallbackQuestions[stage];
-  const preferred = stagePrompts[retryCount % stagePrompts.length];
-
-  const reactionMap = {
-    correct: "yeah, that makes sense.",
-    partial: "you're close, think about this:",
-    wrong: "hmm, not exactly...",
-    no_answer: "that's okay, let's think about it together.",
-  };
-
   const reaction = reactionMap[answerAssessment] || reactionMap.partial;
 
-  if (struggleCount >= 3) {
-    return `${reaction} let's move on - ${preferred}`;
+  if (isSessionStart && stage === "approach") {
+    return stageFallbackQuestions.approach[0];
+  }
+
+  const hints = stageHintPrompts[stage] || stageHintPrompts.approach;
+  if (struggleCount === 1) {
+    return `${reaction} ${hints.small}`;
   }
 
   if (struggleCount === 2) {
-    return `${reaction} clearer hint: focus on what stays true after each step.`;
+    return `${reaction} ${hints.clear}`;
   }
 
-  if (struggleCount === 1 || currentState?.userStuck || (currentState?.stuckCount || 0) >= 2) {
-    return `${reaction} small hint: think about the key invariant first.`;
+  const stagePrompt = stageFallbackQuestions[stage][retryCount % stageFallbackQuestions[stage].length];
+  if (avoidQuestion && stagePrompt.toLowerCase() === String(avoidQuestion).toLowerCase()) {
+    return `${reaction} ${stageFallbackQuestions[stage][(retryCount + 1) % stageFallbackQuestions[stage].length]}`;
   }
 
-  if (isSessionStart && stage === "approach") {
-    return preferred;
-  }
+  return `${reaction} ${stagePrompt}`;
+};
 
-  if (avoidQuestion && preferred.toLowerCase() === String(avoidQuestion).toLowerCase()) {
-    return stagePrompts[(retryCount + 1) % stagePrompts.length];
-  }
-
-  return `${reaction} ${preferred}`;
+const enforceSingleAsk = (text = "") => {
+  const value = String(text || "").trim();
+  const firstQuestionIndex = value.indexOf("?");
+  if (firstQuestionIndex === -1) return value;
+  return value.slice(0, firstQuestionIndex + 1).trim();
 };
 
 const sanitizeInterviewerMessage = (content) => {
@@ -168,6 +212,7 @@ const sanitizeInterviewerMessage = (content) => {
     .replace(/^Interviewer:\s*/i, "")
     .replace(/^Next interviewer message:\s*/i, "")
     .replace(/^Only the next interviewer message\.?\s*/i, "")
+    .replace(/^Return only the next interviewer message\.?\s*/i, "")
     .trim();
 
   const maxCharsMessage = clampText(cleaned, MAX_RESPONSE_CHARS);
@@ -178,7 +223,8 @@ const sanitizeInterviewerMessage = (content) => {
     .slice(0, 2)
     .join("\n");
 
-  return maxLinesMessage || "hmm, can you walk me through your next step?";
+  const singleAskMessage = enforceSingleAsk(maxLinesMessage);
+  return singleAskMessage || "hmm, can you walk me through your next step?";
 };
 
 const generateInterviewerMessage = async ({
@@ -188,7 +234,6 @@ const generateInterviewerMessage = async ({
   struggleCount,
   answerAssessment,
   avoidQuestion,
-  currentState,
   retryCount = 0,
   isSessionStart = false,
 }) => {
@@ -204,7 +249,6 @@ const generateInterviewerMessage = async ({
   if (!openaiApiKey) {
     return fallbackInterviewerMessage({
       isSessionStart,
-      currentState,
       currentStage,
       struggleCount,
       answerAssessment,
@@ -239,7 +283,6 @@ const generateInterviewerMessage = async ({
     });
     return fallbackInterviewerMessage({
       isSessionStart,
-      currentState,
       currentStage,
       struggleCount,
       answerAssessment,
