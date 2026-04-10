@@ -7,6 +7,8 @@ const contestRoutes = require("./contestRoutes");
 const recommendationRoutes = require("./recommendationRoutes");
 const communityRoutes = require("./communityRoutes");
 const adminRoutes = require("./adminRoutes");
+const userRoutes = require("./userRoutes");
+const interviewRoutes = require("./interviewRoutes");
 
 const router = express.Router();
 
@@ -17,5 +19,7 @@ router.use("/contests", contestRoutes);
 router.use("/recommendations", recommendationRoutes);
 router.use("/", communityRoutes);
 router.use("/admin", adminRoutes);
+router.use("/user", userRoutes);
+router.use("/interview", interviewRoutes);
 
 module.exports = router;

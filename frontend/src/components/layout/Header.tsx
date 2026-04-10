@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   Trophy,
   Shield,
+  Brain,
   User,
   LogOut,
   ChevronDown,
@@ -22,6 +23,7 @@ const baseNavItems = [
   { href: "/problems", label: "Problems", icon: Code2 },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/contests", label: "Contests", icon: Trophy },
+  { href: "/weakness", label: "🧠 Weakness Report", icon: Brain },
 ];
 
 export default function Header() {

@@ -12,6 +12,7 @@ import {
   Clock,
   AlertTriangle,
   Send,
+  Mic,
   FlaskConical,
   FileText,
   AlignLeft,
@@ -31,8 +32,10 @@ type Props = {
   code: string;
   setCode: (value: string) => void;
   setLanguage: (value: string) => void;
+  onStartInterview?: () => void;
   onSubmit: () => void;
   onRun: () => void;
+  interviewStarting?: boolean;
   submitting: boolean;
   running: boolean;
   result?: {
@@ -150,8 +153,10 @@ export default function CodePlayground({
   code,
   setCode,
   setLanguage,
+  onStartInterview,
   onSubmit,
   onRun,
+  interviewStarting = false,
   submitting,
   running,
   result,
@@ -402,9 +407,28 @@ export default function CodePlayground({
               </>
             )}
           </button>
+          {onStartInterview ? (
+            <button
+              onClick={onStartInterview}
+              disabled={interviewStarting || submitting || running}
+              className="btn btn-secondary whitespace-nowrap"
+            >
+              {interviewStarting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Starting...
+                </>
+              ) : (
+                <>
+                  <Mic className="h-4 w-4" />
+                  🎤 Start Interview
+                </>
+              )}
+            </button>
+          ) : null}
           <button
             onClick={onSubmit}
-            disabled={submitting || running}
+            disabled={submitting || running || interviewStarting}
             className="btn btn-success whitespace-nowrap"
           >
             {submitting ? (

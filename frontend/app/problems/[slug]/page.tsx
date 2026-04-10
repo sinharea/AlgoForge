@@ -1,13 +1,14 @@
 "use client";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import toast from "react-hot-toast";
 import { clsx } from "clsx";
 import { Clock, Tag, Copy, Check, BookOpen, FileCode, TestTube, CheckCircle2, XCircle, AlertTriangle, Loader2, ShieldCheck, Hash, Scale } from "lucide-react";
 import { problemApi, RunResult } from "@/src/api/problemApi";
+import { interviewApi } from "@/src/api/interviewApi";
 import CodePlayground from "@/src/features/editor/CodePlayground";
 import { EditorSkeleton } from "@/src/components/ui/Skeleton";
 import ErrorState from "@/src/components/ui/ErrorState";
@@ -96,6 +97,7 @@ const buildCodeDiff = (leftCode = "", rightCode = "") => {
 
 export default function ProblemDetailPage() {
   useProtectedRoute();
+  const router = useRouter();
   const { slug } = useParams<{ slug: string }>();
   const searchParams = useSearchParams();
   const contestId = searchParams.get("contestId");
@@ -198,6 +200,24 @@ export default function ProblemDetailPage() {
     },
     onError: (error: any) => {
       const errorMsg = error?.response?.data?.error?.message || error?.response?.data?.message || "Submit failed";
+      toast.error(errorMsg);
+    },
+  });
+
+  const startInterviewMutation = useMutation({
+    mutationFn: async () => {
+      if (!problemQuery.data?._id) {
+        throw new Error("Problem not ready yet");
+      }
+
+      return (await interviewApi.start({ problemId: problemQuery.data._id })).data;
+    },
+    onSuccess: (data) => {
+      toast.success("Interview session started");
+      router.push(`/interview/${data.sessionId}`);
+    },
+    onError: (error: any) => {
+      const errorMsg = error?.response?.data?.error?.message || error?.message || "Unable to start interview";
       toast.error(errorMsg);
     },
   });
@@ -765,8 +785,10 @@ export default function ProblemDetailPage() {
             code={code}
             setCode={handleCodeChange}
             setLanguage={handleLanguageChange}
+            onStartInterview={() => startInterviewMutation.mutate()}
             onSubmit={() => submissionMutation.mutate()}
             onRun={() => runMutation.mutate()}
+            interviewStarting={startInterviewMutation.isPending}
             submitting={submissionMutation.isPending}
             running={runMutation.isPending}
             result={result}

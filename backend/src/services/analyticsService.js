@@ -1,13 +1,19 @@
 const UserTopicAnalytics = require("../models/UserTopicAnalytics");
+const TopicStat = require("../models/TopicStat");
+
+const normalizeTags = (tags = []) =>
+  [...new Set(tags.map((tag) => String(tag || "").trim()).filter(Boolean))];
 
 const updateUserTopicAnalytics = async ({ userId, tags = [], solved, runtime = 0 }) => {
   let analytics = await UserTopicAnalytics.findOne({ user: userId });
   if (!analytics) analytics = await UserTopicAnalytics.create({ user: userId, topics: [] });
 
+  const normalizedTags = normalizeTags(tags);
+
   analytics.totalAttempts += 1;
   if (solved) analytics.totalSolved += 1;
 
-  for (const topic of tags) {
+  for (const topic of normalizedTags) {
     let stat = analytics.topics.find((entry) => entry.topic === topic);
     if (!stat) {
       analytics.topics.push({
@@ -32,4 +38,39 @@ const updateUserTopicAnalytics = async ({ userId, tags = [], solved, runtime = 0
   return analytics;
 };
 
-module.exports = { updateUserTopicAnalytics };
+const updateUserTopicStats = async ({ userId, tags = [], solved }) => {
+  const normalizedTags = normalizeTags(tags);
+  if (!normalizedTags.length) return [];
+
+  const updates = [];
+
+  for (const topic of normalizedTags) {
+    const existing = await TopicStat.findOne({ userId, topic });
+
+    if (!existing) {
+      const attempts = 1;
+      const correct = solved ? 1 : 0;
+      updates.push(
+        await TopicStat.create({
+          userId,
+          topic,
+          attempts,
+          correct,
+          accuracy: Number((correct / attempts).toFixed(4)),
+        })
+      );
+      continue;
+    }
+
+    existing.attempts += 1;
+    if (solved) existing.correct += 1;
+    existing.accuracy = existing.attempts
+      ? Number((existing.correct / existing.attempts).toFixed(4))
+      : 0;
+    updates.push(await existing.save());
+  }
+
+  return updates;
+};
+
+module.exports = { updateUserTopicAnalytics, updateUserTopicStats };

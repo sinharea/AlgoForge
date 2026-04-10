@@ -7,7 +7,7 @@ const { SUBMISSION_STATUS, VERDICTS } = require("../constants");
 const { queueEnabled } = require("../config/env");
 const { ensureContestSubmissionAllowed, trackContestSubmission } = require("../services/contestService");
 const { judgeSubmission, execute, normalize, truncateOutput } = require("../services/executionService");
-const { updateUserTopicAnalytics } = require("../services/analyticsService");
+const { updateUserTopicAnalytics, updateUserTopicStats } = require("../services/analyticsService");
 const logger = require("../utils/logger");
 
 // Duplicate submission prevention: track recent submissions per user
@@ -95,6 +95,12 @@ const processSubmissionNow = async (submission) => {
         tags: problem.tags,
         solved: judged.verdict === VERDICTS.ACCEPTED,
         runtime: judged.runtime,
+      });
+
+      await updateUserTopicStats({
+        userId: submission.user,
+        tags: problem.tags,
+        solved: judged.verdict === VERDICTS.ACCEPTED,
       });
     } catch (analyticsErr) {
       logger.warn("Failed to update analytics", { error: analyticsErr.message });

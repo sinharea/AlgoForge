@@ -9,4 +9,5 @@ export const authApi = {
     api.patch("/auth/me", payload),
   meDashboard: () => api.get("/recommendations/dashboard"),
   recommendations: () => api.get("/recommendations"),
+  weaknessReport: () => api.get("/user/weakness"),
 };

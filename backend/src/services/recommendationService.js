@@ -1,8 +1,38 @@
 const mongoose = require("mongoose");
 const Problem = require("../models/Problem");
 const UserTopicAnalytics = require("../models/UserTopicAnalytics");
+const TopicStat = require("../models/TopicStat");
 const Submission = require("../models/Submission");
 const redis = require("../config/redis");
+
+const formatTopicRows = (rows = []) =>
+  rows.map((row) => ({
+    topic: row.topic,
+    accuracy: Number(row.accuracy || 0),
+    attempts: row.attempts,
+    correct: row.correct,
+  }));
+
+const buildImprovementStrategy = ({ weakTopics, strongTopics, recommendationCount }) => {
+  if (!weakTopics.length) {
+    return "You need more submissions before the system can identify weaknesses. Solve mixed-tag Easy problems first, then revisit this report for personalized guidance.";
+  }
+
+  const primaryWeak = weakTopics.slice(0, 2).map((topic) => topic.topic).join(" and ");
+  const strong = strongTopics.slice(0, 2).map((topic) => topic.topic).join(", ");
+
+  const warmupLine = `Spend the next 7 days focusing on ${primaryWeak}.`;
+  const drillLine = "For each topic, solve 2 Easy + 2 Medium problems daily and write a short post-solve note for mistakes.";
+  const reviewLine =
+    recommendationCount > 0
+      ? `You have ${recommendationCount} tailored unsolved problems below; complete them in order of difficulty.`
+      : "No tailored unsolved problems are available right now, so attempt fresh tagged problems from the problem list.";
+  const strengthLine = strong
+    ? `Keep momentum on your strong areas (${strong}) with one maintenance problem every two days.`
+    : "Once your weakest topics cross 70% accuracy, begin balanced practice across all major tags.";
+
+  return `${warmupLine} ${drillLine} ${reviewLine} ${strengthLine}`;
+};
 
 const getUserDashboardStats = async (userId) => {
   const solvedProblems = await Submission.aggregate([
@@ -99,7 +129,87 @@ const getRecommendations = async (userId) => {
   return payload;
 };
 
+const getWeaknessReport = async (userId) => {
+  const stats = await TopicStat.find({ userId }).sort({ accuracy: 1, attempts: -1 }).lean();
+  const normalizedStats = formatTopicRows(stats).filter((row) => row.attempts > 0);
+
+  if (!normalizedStats.length) {
+    return {
+      weak_topics: [],
+      strong_topics: [],
+      recommended_problems: [],
+      strategy:
+        "No data yet. Start solving tagged problems and this report will automatically show your weak areas and recommendations.",
+    };
+  }
+
+  const weakTopics = normalizedStats
+    .filter((row) => row.attempts >= 2)
+    .sort((a, b) => a.accuracy - b.accuracy || b.attempts - a.attempts)
+    .slice(0, 5);
+
+  const fallbackWeak = !weakTopics.length
+    ? normalizedStats.slice(0, Math.min(3, normalizedStats.length))
+    : weakTopics;
+
+  const strongTopics = normalizedStats
+    .filter((row) => row.attempts >= 2 && row.accuracy >= 0.7)
+    .sort((a, b) => b.accuracy - a.accuracy || b.attempts - a.attempts)
+    .slice(0, 5);
+
+  const weakTopicNames = fallbackWeak.map((row) => row.topic);
+
+  const solvedProblemIds = await Submission.distinct("problem", {
+    user: userId,
+    verdict: "Accepted",
+  });
+
+  let recommendedProblems = [];
+
+  if (weakTopicNames.length) {
+    recommendedProblems = await Problem.find({
+      _id: { $nin: solvedProblemIds },
+      tags: { $in: weakTopicNames },
+    })
+      .select("title slug difficulty tags")
+      .limit(10)
+      .lean();
+  }
+
+  if (recommendedProblems.length < 5) {
+    const existingIds = recommendedProblems.map((problem) => problem._id);
+    const fallbackProblems = await Problem.find({
+      _id: { $nin: [...solvedProblemIds, ...existingIds] },
+    })
+      .select("title slug difficulty tags")
+      .limit(10 - recommendedProblems.length)
+      .lean();
+
+    recommendedProblems = [...recommendedProblems, ...fallbackProblems];
+  }
+
+  recommendedProblems = recommendedProblems.slice(0, 10);
+
+  return {
+    weak_topics: fallbackWeak.map(({ topic, accuracy, attempts }) => ({ topic, accuracy, attempts })),
+    strong_topics: strongTopics.map(({ topic, accuracy, attempts }) => ({ topic, accuracy, attempts })),
+    recommended_problems: recommendedProblems.map((problem) => ({
+      id: problem._id,
+      title: problem.title,
+      slug: problem.slug,
+      difficulty: problem.difficulty,
+      tags: problem.tags || [],
+    })),
+    strategy: buildImprovementStrategy({
+      weakTopics: fallbackWeak,
+      strongTopics,
+      recommendationCount: recommendedProblems.length,
+    }),
+  };
+};
+
 module.exports = {
   getUserDashboardStats,
   getRecommendations,
+  getWeaknessReport,
 };
