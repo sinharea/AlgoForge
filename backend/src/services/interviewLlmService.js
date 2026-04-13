@@ -1,10 +1,27 @@
 const axios = require("axios");
-const { openaiApiKey, openaiBaseUrl, openaiModel } = require("../config/env");
+const {
+  geminiApiKey,
+  geminiBaseUrl,
+  geminiModel,
+  openaiApiKey,
+  openaiBaseUrl,
+  openaiModel,
+} = require("../config/env");
 const logger = require("../utils/logger");
 
 const MAX_PROBLEM_CHARS = 4200;
 const MAX_HISTORY_CHARS = 3200;
 const MAX_RESPONSE_CHARS = 320;
+const LLM_TEMPERATURE = 0.15;
+const LLM_TOP_P = 0.3;
+
+const STAGE_KEYWORDS = {
+  approach: ["approach", "idea", "strategy", "start", "data structure", "hash", "two pointer", "sliding"],
+  complexity: ["complexity", "big-o", "time", "space", "o(", "linear", "quadratic", "log"],
+  edge_cases: ["edge", "corner", "empty", "duplicate", "null", "boundary", "overflow", "large input"],
+  optimization: ["optimi", "improv", "trade-off", "tradeoff", "memory", "runtime", "faster"],
+  coding: ["code", "implement", "function", "loop", "condition", "invariant", "pseudo"],
+};
 
 const clampText = (text = "", maxChars = 1000) => {
   const value = String(text || "").trim();
@@ -47,6 +64,13 @@ ${conversationHistory}
 
 Current stage:
 ${currentStage}
+
+Stage focus guidance (strict):
+- approach: ask about high-level strategy/data-structure choice
+- complexity: ask about time/space complexity precisely
+- edge_cases: ask about corner/invalid/boundary inputs
+- optimization: ask for runtime/memory improvement trade-offs
+- coding: ask implementation structure/invariants/checks
 
 User struggle level:
 ${struggleCount}
@@ -227,6 +251,82 @@ const sanitizeInterviewerMessage = (content) => {
   return singleAskMessage || "hmm, can you walk me through your next step?";
 };
 
+const isUsableInterviewerMessage = ({ message, currentStage }) => {
+  const text = String(message || "").trim();
+  if (!text) return false;
+  if (text.length < 16) return false;
+  if (/[,;:-]$/.test(text)) return false;
+
+  const lower = text.toLowerCase();
+  const stage = STAGE_KEYWORDS[currentStage] ? currentStage : "approach";
+  const hasStageKeyword = STAGE_KEYWORDS[stage].some((keyword) => lower.includes(keyword));
+  const hasQuestionOrHint = /\?|hint|consider|try|focus|walk me through|what if|how would|can you/.test(lower);
+
+  return hasStageKeyword || hasQuestionOrHint;
+};
+
+const extractGeminiText = (payload) => {
+  const parts = payload?.candidates?.[0]?.content?.parts;
+  if (!Array.isArray(parts) || parts.length === 0) return "";
+
+  return parts
+    .map((part) => String(part?.text || "").trim())
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+};
+
+const generateWithGemini = async (prompt) => {
+  const trimmedBaseUrl = String(geminiBaseUrl || "").replace(/\/+$/, "");
+  const endpoint = trimmedBaseUrl.endsWith("/models")
+    ? `${trimmedBaseUrl}/${geminiModel}:generateContent`
+    : `${trimmedBaseUrl}/models/${geminiModel}:generateContent`;
+    console.log("Gemini API endpoint:", endpoint);
+  const response = await axios.post(
+    endpoint,
+    {
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: LLM_TEMPERATURE,
+        topP: LLM_TOP_P,
+        maxOutputTokens: 120,
+      },
+    },
+    {
+      params: { key: geminiApiKey },
+      headers: {
+        "Content-Type": "application/json",
+      },
+      timeout: 20000,
+    }
+  );
+  console.log(response.data);
+
+  return extractGeminiText(response.data);
+};
+
+const generateWithOpenAi = async (prompt) => {
+  const response = await axios.post(
+    `${openaiBaseUrl}/chat/completions`,
+    {
+      model: openaiModel,
+      temperature: LLM_TEMPERATURE,
+      top_p: LLM_TOP_P,
+      max_tokens: 120,
+      messages: [{ role: "user", content: prompt }],
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${openaiApiKey}`,
+        "Content-Type": "application/json",
+      },
+      timeout: 20000,
+    }
+  );
+
+  return response.data?.choices?.[0]?.message?.content;
+};
+
 const generateInterviewerMessage = async ({
   problemStatement,
   conversationHistory,
@@ -246,7 +346,8 @@ const generateInterviewerMessage = async ({
     avoidQuestion,
   });
 
-  if (!openaiApiKey) {
+  if (!geminiApiKey && !openaiApiKey) {
+    logger.warn("No API keys provided; falling back to default message.");
     return fallbackInterviewerMessage({
       isSessionStart,
       currentStage,
@@ -256,40 +357,53 @@ const generateInterviewerMessage = async ({
       retryCount,
     });
   }
-
-  try {
-    const response = await axios.post(
-      `${openaiBaseUrl}/chat/completions`,
-      {
-        model: openaiModel,
-        temperature: 0.35,
-        max_tokens: 120,
-        messages: [{ role: "user", content: prompt }],
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${openaiApiKey}`,
-          "Content-Type": "application/json",
-        },
-        timeout: 20000,
+  if (geminiApiKey) {
+    try {
+      console.log("Calling Gemini with prompt:", prompt);
+      const message = await generateWithGemini(prompt);
+      if (message) {
+        const sanitized = sanitizeInterviewerMessage(message);
+        if (isUsableInterviewerMessage({ message: sanitized, currentStage })) {
+          return sanitized;
+        }
+        providerErrors.push("Gemini returned low-quality content");
+      } else {
+        providerErrors.push("Gemini returned empty content");
       }
-    );
-
-    const message = response.data?.choices?.[0]?.message?.content;
-    return sanitizeInterviewerMessage(message);
-  } catch (error) {
-    logger.warn("Interview LLM call failed; using fallback", {
-      error: error.response?.data?.error?.message || error.message,
-    });
-    return fallbackInterviewerMessage({
-      isSessionStart,
-      currentStage,
-      struggleCount,
-      answerAssessment,
-      avoidQuestion,
-      retryCount,
-    });
+    } catch (error) {
+      providerErrors.push(error.response?.data?.error?.message || error.message);
+    }
   }
+
+  if (openaiApiKey) {
+    try {
+      const message = await generateWithOpenAi(prompt);
+      if (message) {
+        const sanitized = sanitizeInterviewerMessage(message);
+        if (isUsableInterviewerMessage({ message: sanitized, currentStage })) {
+          return sanitized;
+        }
+        providerErrors.push("OpenAI returned low-quality content");
+      } else {
+        providerErrors.push("OpenAI returned empty content");
+      }
+    } catch (error) {
+      providerErrors.push(error.response?.data?.error?.message || error.message);
+    }
+  }
+
+  logger.warn("Interview LLM call failed; using fallback", {
+    error: providerErrors.join(" | ") || "No available provider",
+  });
+
+  return fallbackInterviewerMessage({
+    isSessionStart,
+    currentStage,
+    struggleCount,
+    answerAssessment,
+    avoidQuestion,
+    retryCount,
+  });
 };
 
 module.exports = {

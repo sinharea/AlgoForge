@@ -23,9 +23,14 @@ const runCodeSchema = z.object({
   ).min(1).max(10),
 });
 
+const submissionIdParamsSchema = z.object({
+  id: z.string().regex(/^[a-fA-F0-9]{24}$/, "Invalid submission id"),
+});
+
 module.exports = {
   createSubmissionSchema,
   runCodeSchema,
+  submissionIdParamsSchema,
   supportedLanguages,
   MAX_CODE_SIZE,
 };

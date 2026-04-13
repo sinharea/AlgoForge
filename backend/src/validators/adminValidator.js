@@ -12,6 +12,7 @@ const adminProblemCreateSchema = z.object({
   difficulty: z.enum([DIFFICULTY.EASY, DIFFICULTY.MEDIUM, DIFFICULTY.HARD]),
   tags: z.array(z.string().trim().min(1).max(40)).max(20).default([]),
   constraints: z.string().trim().max(5000).optional(),
+  editorialSolution: z.string().trim().max(100000).optional(),
   timeLimit: z.number().int().positive().max(10000).default(2000),
   memoryLimit: z.number().int().positive().max(1024).default(128),
 });

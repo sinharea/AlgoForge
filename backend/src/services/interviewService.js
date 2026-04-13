@@ -1,6 +1,7 @@
 const InterviewSession = require("../models/InterviewSession");
 const Problem = require("../models/Problem");
 const ApiError = require("../utils/apiError");
+const { interviewLastNChats, interviewChatPageSize } = require("../config/env");
 const {
   formatConversationHistory,
   generateInterviewerMessage,
@@ -164,19 +165,71 @@ const formatProblemStatement = (problem) => {
   ].join("\n\n");
 };
 
-const toSessionResponse = (session, problem) => ({
-  sessionId: session._id,
-  problem: {
-    id: problem._id,
-    title: problem.title,
-    slug: problem.slug,
-    difficulty: problem.difficulty,
-  },
-  messages: session.messages,
-  currentStage: normalizeStage(session.currentStage || session.currentState?.currentStage),
-  currentState: session.currentState,
-  createdAt: session.createdAt,
-});
+const MAX_CHAT_PAGE_SIZE = 100;
+
+const resolvePageSize = (value) => {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return Math.min(interviewChatPageSize, MAX_CHAT_PAGE_SIZE);
+  }
+  return Math.min(parsed, MAX_CHAT_PAGE_SIZE);
+};
+
+const resolveBeforeIndex = (value, totalMessages) => {
+  if (value === undefined || value === null || value === "") {
+    return totalMessages;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) {
+    return totalMessages;
+  }
+
+  if (parsed <= 0) return 0;
+  if (parsed >= totalMessages) return totalMessages;
+  return parsed;
+};
+
+const paginateMessages = (messages = [], { beforeIndex, limit } = {}) => {
+  const totalMessages = Array.isArray(messages) ? messages.length : 0;
+  const pageSize = resolvePageSize(limit);
+  const resolvedBeforeIndex = resolveBeforeIndex(beforeIndex, totalMessages);
+
+  const startIndex = Math.max(resolvedBeforeIndex - pageSize, 0);
+  const endIndex = resolvedBeforeIndex;
+  const chunk = messages.slice(startIndex, endIndex);
+
+  return {
+    messages: chunk,
+    pagination: {
+      total: totalMessages,
+      pageSize,
+      startIndex,
+      endIndex,
+      hasMore: startIndex > 0,
+      nextBeforeIndex: startIndex > 0 ? startIndex : null,
+    },
+  };
+};
+
+const toSessionResponse = (session, problem, pageOptions = {}) => {
+  const paged = paginateMessages(session.messages, pageOptions);
+
+  return {
+    sessionId: session._id,
+    problem: {
+      id: problem._id,
+      title: problem.title,
+      slug: problem.slug,
+      difficulty: problem.difficulty,
+    },
+    messages: paged.messages,
+    pagination: paged.pagination,
+    currentStage: normalizeStage(session.currentStage || session.currentState?.currentStage),
+    currentState: session.currentState,
+    createdAt: session.createdAt,
+  };
+};
 
 const startInterviewSession = async ({ userId, problemId }) => {
   const problem = await Problem.findById(problemId)
@@ -185,6 +238,17 @@ const startInterviewSession = async ({ userId, problemId }) => {
 
   if (!problem) {
     throw ApiError.notFound("Problem not found");
+  }
+
+  const existingSession = await InterviewSession.findOne({
+    userId,
+    problemId: problem._id,
+  }).sort({ createdAt: -1 });
+
+  if (existingSession?.messages?.length) {
+    return toSessionResponse(existingSession, problem, {
+      limit: interviewChatPageSize,
+    });
   }
 
   const currentState = {
@@ -208,6 +272,29 @@ const startInterviewSession = async ({ userId, problemId }) => {
     isSessionStart: true,
   });
 
+  if (existingSession) {
+    existingSession.messages = [
+      {
+        role: "interviewer",
+        content: firstMessageContent,
+        timestamp: new Date(),
+      },
+    ];
+    existingSession.currentStage = currentStage;
+    existingSession.currentState = {
+      ...currentState,
+      lastInterviewerQuestion: firstMessageContent,
+    };
+    await existingSession.save();
+
+    return {
+      ...toSessionResponse(existingSession, problem, {
+        limit: interviewChatPageSize,
+      }),
+      firstMessage: existingSession.messages[0],
+    };
+  }
+
   const session = await InterviewSession.create({
     userId,
     problemId: problem._id,
@@ -226,7 +313,9 @@ const startInterviewSession = async ({ userId, problemId }) => {
   await session.save();
 
   return {
-    ...toSessionResponse(session, problem),
+    ...toSessionResponse(session, problem, {
+      limit: interviewChatPageSize,
+    }),
     firstMessage: session.messages[0],
   };
 };
@@ -295,7 +384,7 @@ const respondInterviewSession = async ({ userId, sessionId, userMessage }) => {
     lastInterviewerQuestion: session.currentState?.lastInterviewerQuestion || "",
   };
 
-  const recentConversation = formatConversationHistory(session.messages, 6);
+  const recentConversation = formatConversationHistory(session.messages, interviewLastNChats);
 
   const recentInterviewerQuestions = session.messages
     .filter((message) => message.role === "interviewer")
@@ -360,13 +449,15 @@ const respondInterviewSession = async ({ userId, sessionId, userMessage }) => {
   await session.save();
 
   return {
-    ...toSessionResponse(session, session.problemId),
+    ...toSessionResponse(session, session.problemId, {
+      limit: interviewChatPageSize,
+    }),
     interviewerMessage,
     currentStage: progressedStage,
   };
 };
 
-const getInterviewSession = async ({ userId, sessionId }) => {
+const getInterviewSession = async ({ userId, sessionId, beforeIndex, limit }) => {
   const session = await InterviewSession.findById(sessionId).populate(
     "problemId",
     "title slug difficulty"
@@ -380,11 +471,38 @@ const getInterviewSession = async ({ userId, sessionId }) => {
     throw ApiError.forbidden("You can only access your own interview sessions");
   }
 
-  return toSessionResponse(session, session.problemId);
+  return toSessionResponse(session, session.problemId, {
+    beforeIndex,
+    limit,
+  });
+};
+
+const getInterviewSessionMessages = async ({ userId, sessionId, beforeIndex, limit }) => {
+  const session = await InterviewSession.findById(sessionId);
+
+  if (!session) {
+    throw ApiError.notFound("Interview session not found");
+  }
+
+  if (String(session.userId) !== String(userId)) {
+    throw ApiError.forbidden("You can only access your own interview sessions");
+  }
+
+  const paged = paginateMessages(session.messages, {
+    beforeIndex,
+    limit,
+  });
+
+  return {
+    sessionId: session._id,
+    messages: paged.messages,
+    pagination: paged.pagination,
+  };
 };
 
 module.exports = {
   startInterviewSession,
   respondInterviewSession,
   getInterviewSession,
+  getInterviewSessionMessages,
 };

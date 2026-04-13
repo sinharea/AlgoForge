@@ -30,13 +30,13 @@ const getAllProblems = asyncHandler(async (req, res) => {
 });
 
 const getProblemById = asyncHandler(async (req, res) => {
-  const problem = await Problem.findById(req.params.id).select("-testCases");
+  const problem = await Problem.findById(req.params.id).select("-testCases -editorialSolution");
   if (!problem) throw new ApiError(404, "Problem not found");
   res.json(problem);
 });
 
 const getProblemBySlug = asyncHandler(async (req, res) => {
-  const problem = await Problem.findOne({ slug: req.params.slug }).select("-testCases");
+  const problem = await Problem.findOne({ slug: req.params.slug }).select("-testCases -editorialSolution");
   if (!problem) throw new ApiError(404, "Problem not found");
   res.json(problem);
 });

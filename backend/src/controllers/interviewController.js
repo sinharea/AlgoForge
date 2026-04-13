@@ -3,6 +3,7 @@ const {
   startInterviewSession,
   respondInterviewSession,
   getInterviewSession,
+  getInterviewSessionMessages,
 } = require("../services/interviewService");
 
 const startInterview = asyncHandler(async (req, res) => {
@@ -28,6 +29,19 @@ const getInterviewById = asyncHandler(async (req, res) => {
   const data = await getInterviewSession({
     userId: req.user._id,
     sessionId: req.params.sessionId,
+    beforeIndex: req.query.beforeIndex,
+    limit: req.query.limit,
+  });
+
+  res.json(data);
+});
+
+const getInterviewMessages = asyncHandler(async (req, res) => {
+  const data = await getInterviewSessionMessages({
+    userId: req.user._id,
+    sessionId: req.params.sessionId,
+    beforeIndex: req.query.beforeIndex,
+    limit: req.query.limit,
   });
 
   res.json(data);
@@ -37,4 +51,5 @@ module.exports = {
   startInterview,
   respondInterview,
   getInterviewById,
+  getInterviewMessages,
 };

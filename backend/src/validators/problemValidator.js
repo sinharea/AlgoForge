@@ -18,6 +18,7 @@ const createProblemSchema = z.object({
   ]),
   tags: z.array(z.string().min(1)).default([]),
   constraints: z.string().optional(),
+  editorialSolution: z.string().max(100000).optional(),
   testCases: z.array(testCaseSchema).min(1),
   sampleTestCases: z.array(testCaseSchema).default([]),
   timeLimit: z.number().int().positive().max(10000).default(2000),

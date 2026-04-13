@@ -16,8 +16,14 @@ const interviewSessionParamsSchema = z.object({
   sessionId: objectId,
 });
 
+const interviewMessagesQuerySchema = z.object({
+  beforeIndex: z.coerce.number().int().nonnegative().optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
 module.exports = {
   startInterviewSchema,
   respondInterviewSchema,
   interviewSessionParamsSchema,
+  interviewMessagesQuerySchema,
 };

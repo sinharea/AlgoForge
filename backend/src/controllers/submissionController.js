@@ -8,6 +8,7 @@ const { queueEnabled } = require("../config/env");
 const { ensureContestSubmissionAllowed, trackContestSubmission } = require("../services/contestService");
 const { judgeSubmission, execute, normalize, truncateOutput } = require("../services/executionService");
 const { updateUserTopicAnalytics, updateUserTopicStats } = require("../services/analyticsService");
+const { generateCodeReview } = require("../services/codeReviewService");
 const logger = require("../utils/logger");
 
 // Duplicate submission prevention: track recent submissions per user
@@ -41,6 +42,32 @@ const isDuplicateSubmission = (userId, problemId, code) => {
   }
 
   return false;
+};
+
+const buildComplexityHint = (userCode = "") => {
+  const code = String(userCode || "");
+  let hint = "";
+
+  if (
+    code.includes("HashMap") ||
+    code.includes("map.get") ||
+    code.includes("map.put") ||
+    code.includes("Set") ||
+    code.includes("unordered_map") ||
+    code.includes("unordered_set") ||
+    code.includes("new Map(") ||
+    code.includes("new Set(")
+  ) {
+    hint += "HashMap/Set operations are O(1). ";
+  }
+
+  const forCount = (code.match(/\bfor\b/g) || []).length;
+  const whileCount = (code.match(/\bwhile\b/g) || []).length;
+  if (forCount + whileCount === 1) {
+    hint += "Code contains only one loop.";
+  }
+
+  return hint.trim();
 };
 
 const processSubmissionNow = async (submission) => {
@@ -224,6 +251,51 @@ const getSubmissionById = asyncHandler(async (req, res) => {
   res.json(submission);
 });
 
+const getSubmissionReview = asyncHandler(async (req, res) => {
+  const submission = await Submission.findById(req.params.id)
+    .select("_id user problem language code verdict status")
+    .populate("problem", "title slug editorialSolution optimalCode editorialCode solution");
+
+  if (!submission) throw new ApiError(404, "Submission not found");
+
+  if (String(submission.user) !== String(req.user._id) && req.user.role !== "admin") {
+    throw new ApiError(403, "Unauthorized to review this submission");
+  }
+
+  const user_code = String(submission.code || "").trim();
+  if (!user_code) {
+    throw ApiError.badRequest("User code missing");
+  }
+
+  const problem = submission.problem || {};
+  let optimal_code =
+    problem.editorialSolution ||
+    problem.optimalCode ||
+    problem.editorialCode ||
+    problem.solution ||
+    "";
+
+  if (optimal_code && typeof optimal_code === "object") {
+    optimal_code = optimal_code[submission.language] || "";
+  }
+
+  optimal_code = String(optimal_code || "").trim();
+  const hint = buildComplexityHint(user_code);
+
+  console.log("User Code:", user_code);
+  console.log("Optimal Code:", optimal_code);
+  console.log("Hint:", hint);
+
+  const review = await generateCodeReview({ user_code, optimal_code, hint });
+
+  res.json({
+    submissionId: submission._id,
+    problemId: problem._id,
+    hasOptimalCode: Boolean(optimal_code),
+    review,
+  });
+});
+
 const getMySubmissions = asyncHandler(async (req, res) => {
   const { page = 1, limit = 20, problemId } = req.query;
   const query = { user: req.user._id };
@@ -279,6 +351,7 @@ const runCode = asyncHandler(async (req, res) => {
 module.exports = {
   createSubmission,
   getSubmissionById,
+  getSubmissionReview,
   getMySubmissions,
   processSubmissionNow,
   runCode,

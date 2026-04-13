@@ -59,5 +59,6 @@ const interviewSessionSchema = new mongoose.Schema(
 );
 
 interviewSessionSchema.index({ userId: 1, createdAt: -1 });
+interviewSessionSchema.index({ userId: 1, problemId: 1, createdAt: -1 });
 
 module.exports = mongoose.model("InterviewSession", interviewSessionSchema);

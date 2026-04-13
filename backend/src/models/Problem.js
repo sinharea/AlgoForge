@@ -28,6 +28,10 @@ const problemSchema = new mongoose.Schema({
     required: true,
   },
   constraints: String,
+  editorialSolution: {
+    type: String,
+    default: "",
+  },
   tags: [{ type: String, index: true }],
 
   testCases: [

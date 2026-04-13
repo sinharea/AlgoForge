@@ -9,6 +9,12 @@ const getRequired = (key) => {
   return value;
 };
 
+const toPositiveInt = (value, fallback) => {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) return fallback;
+  return parsed;
+};
+
 const nodeEnv = process.env.NODE_ENV || "development";
 
 module.exports = {
@@ -43,9 +49,14 @@ module.exports = {
   codeExecApi: process.env.CODE_EXEC_API || "http://localhost:2358",
   executionApiUrl: process.env.EXECUTION_API_URL || process.env.CODE_EXEC_API,
   executionApiKey: process.env.EXECUTION_API_KEY,
+  geminiApiKey: process.env.GEMINI_API_KEY,
+  geminiBaseUrl: process.env.GEMINI_BASE_URL || "https://generativelanguage.googleapis.com/v1beta/models",
+  geminiModel: process.env.GEMINI_MODEL || "gemini-2.5-flash",
   openaiApiKey: process.env.OPENAI_API_KEY,
   openaiBaseUrl: process.env.OPENAI_BASE_URL || "https://api.openai.com/v1",
   openaiModel: process.env.OPENAI_MODEL || "gpt-4o-mini",
+  interviewLastNChats: toPositiveInt(process.env.INTERVIEW_LAST_N_CHATS, 10),
+  interviewChatPageSize: toPositiveInt(process.env.INTERVIEW_CHAT_PAGE_SIZE, 20),
   dockerNetworkDisabled: process.env.DOCKER_NETWORK_DISABLED !== "false",
   dockerCpuLimit: process.env.DOCKER_CPU_LIMIT || "0.5",
   dockerMemoryLimit: process.env.DOCKER_MEMORY_LIMIT || "256m",
