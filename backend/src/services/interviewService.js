@@ -10,6 +10,7 @@ const {
 const STUCK_PATTERN = /\b(stuck|hint|help|confused|no idea|don't know|dont know|unclear)\b/i;
 const NO_ANSWER_PATTERN = /\b(idk|i don't know|dont know|no idea|not sure|skip|pass)\b/i;
 const END_SIGNAL_PATTERN = /^(no|nope|that's all|thats all|nothing else)$/i;
+const OFF_TOPIC_PATTERN = /\b(who are you|what are you|your name|hello|hi\b|hey\b|how are you|thanks|thank you|bye|good morning|good night)\b/i;
 const INTERVIEW_STAGES = ["approach", "complexity", "edge_cases", "optimization", "coding"];
 
 const APPROACH_PATTERN = /\b(hash|map|set|array|two[-\s]?pointer|sliding\s+window|binary\s+search|dp|dynamic\s+programming|greedy|stack|queue|graph|tree|sort|prefix|backtrack|brute)\b/i;
@@ -115,7 +116,7 @@ const stageFallbackQuestion = (stage, assessment = "partial", struggleCount = 0,
   }
 
   const prompts = {
-    approach: "okay, what approach would you start with here?",
+    approach: "okay, what approach would you start with here, and what's your intuition?",
     complexity: "interesting. what would the time and space complexity be?",
     edge_cases: "hmm, any tricky inputs that could break this?",
     optimization: "that makes sense. can this be optimized further?",
@@ -125,13 +126,25 @@ const stageFallbackQuestion = (stage, assessment = "partial", struggleCount = 0,
   return `${reaction} ${prompts[normalizeStage(stage)] || prompts.approach}`;
 };
 
+const stageRedirectQuestion = (stage) => {
+  const prompts = {
+    approach: "Let's stay on the problem. What's your approach and intuition?",
+    complexity: "Let's stay on the problem. What are the time and space complexities?",
+    edge_cases: "Let's stay on the problem. Which edge cases could break your approach?",
+    optimization: "Let's stay on the problem. What optimization would you try next?",
+    coding: "Let's stay on the problem. How would you structure the implementation?",
+  };
+
+  return prompts[normalizeStage(stage)] || prompts.approach;
+};
+
 const assessUserResponse = ({ stage, userMessage }) => {
   const text = String(userMessage || "").trim();
   if (!text) return "no_answer";
   if (NO_ANSWER_PATTERN.test(text)) return "no_answer";
   if (STUCK_PATTERN.test(text)) return "wrong";
 
-  const isSubstantive = text.length >= 24;
+  const isSubstantive = text.length >= 18;
   const patternByStage = {
     approach: APPROACH_PATTERN,
     complexity: COMPLEXITY_PATTERN,
@@ -141,7 +154,7 @@ const assessUserResponse = ({ stage, userMessage }) => {
   };
 
   const pattern = patternByStage[normalizeStage(stage)] || APPROACH_PATTERN;
-  if (pattern.test(text) && isSubstantive) return "correct";
+  if (pattern.test(text) && text.length >= 6) return "correct";
   if (isSubstantive) return "partial";
   return "no_answer";
 };
@@ -342,6 +355,7 @@ const respondInterviewSession = async ({ userId, sessionId, userMessage }) => {
   const resolvedCurrentStage = normalizeStage(
     session.currentStage || session.currentState?.currentStage || "approach"
   );
+  const isOffTopic = OFF_TOPIC_PATTERN.test(normalizedMessage.toLowerCase());
   const answerAssessment = assessUserResponse({
     stage: resolvedCurrentStage,
     userMessage: normalizedMessage,
@@ -350,15 +364,16 @@ const respondInterviewSession = async ({ userId, sessionId, userMessage }) => {
 
   const messageSignalsStuck = STUCK_PATTERN.test(normalizedMessage);
   const isStruggleResponse =
-    messageSignalsStuck || answerAssessment === "wrong" || answerAssessment === "no_answer";
+    !isOffTopic &&
+    (messageSignalsStuck || answerAssessment === "wrong" || answerAssessment === "no_answer");
 
   let nextStuckCount = isStruggleResponse
     ? (session.currentState?.struggleCount ?? session.currentState?.stuckCount ?? 0) + 1
     : Math.max(0, (session.currentState?.struggleCount ?? session.currentState?.stuckCount ?? 0) - 1);
 
   const forceMoveForward =
-    (isStruggleResponse && nextStuckCount >= 3) ||
-    (isEndSignal && nextStuckCount >= 1);
+    !isOffTopic &&
+    ((isStruggleResponse && nextStuckCount >= 3) || (isEndSignal && nextStuckCount >= 1));
   const progressedStage =
     answerAssessment === "correct" || forceMoveForward
       ? nextStage(resolvedCurrentStage)
@@ -394,10 +409,12 @@ const respondInterviewSession = async ({ userId, sessionId, userMessage }) => {
 
   const avoidQuestion = recentInterviewerQuestions.join(" || ");
 
-  const mustForceHint = nextStuckCount >= 2 && progressedStage === resolvedCurrentStage;
+  const mustForceHint = !isOffTopic && nextStuckCount >= 2 && progressedStage === resolvedCurrentStage;
   let interviewerContent;
 
-  if (mustForceHint) {
+  if (isOffTopic) {
+    interviewerContent = stageRedirectQuestion(progressedStage);
+  } else if (mustForceHint) {
     interviewerContent = stageFallbackQuestion(progressedStage, answerAssessment, nextStuckCount, isEndSignal);
   } else {
     interviewerContent = await generateInterviewerMessage({

@@ -16,7 +16,7 @@ const LLM_TEMPERATURE = 0.15;
 const LLM_TOP_P = 0.3;
 
 const STAGE_KEYWORDS = {
-  approach: ["approach", "idea", "strategy", "start", "data structure", "hash", "two pointer", "sliding"],
+  approach: ["approach", "idea", "intuition", "strategy", "start", "data structure", "hash", "two pointer", "sliding"],
   complexity: ["complexity", "big-o", "time", "space", "o(", "linear", "quadratic", "log"],
   edge_cases: ["edge", "corner", "empty", "duplicate", "null", "boundary", "overflow", "large input"],
   optimization: ["optimi", "improv", "trade-off", "tradeoff", "memory", "runtime", "faster"],
@@ -66,7 +66,7 @@ Current stage:
 ${currentStage}
 
 Stage focus guidance (strict):
-- approach: ask about high-level strategy/data-structure choice
+- approach: ask about high-level strategy, intuition, and data-structure choice
 - complexity: ask about time/space complexity precisely
 - edge_cases: ask about corner/invalid/boundary inputs
 - optimization: ask for runtime/memory improvement trade-offs
@@ -148,7 +148,7 @@ const reactionMap = {
 
 const stageFallbackQuestions = {
   approach: [
-    "okay, what approach would you start with here?",
+    "okay, what approach would you start with here, and what's your intuition?",
     "hmm, what core idea are you going with first?",
   ],
   complexity: [
@@ -247,22 +247,22 @@ const sanitizeInterviewerMessage = (content) => {
     .slice(0, 2)
     .join("\n");
 
-  const singleAskMessage = enforceSingleAsk(maxLinesMessage);
+  const singleAskMessage = enforceSingleAsk(maxLinesMessage).replace(/[\s,;:-]+$/g, "");
   return singleAskMessage || "hmm, can you walk me through your next step?";
 };
 
 const isUsableInterviewerMessage = ({ message, currentStage }) => {
   const text = String(message || "").trim();
   if (!text) return false;
-  if (text.length < 16) return false;
-  if (/[,;:-]$/.test(text)) return false;
+  if (text.length < 10) return false;
 
   const lower = text.toLowerCase();
   const stage = STAGE_KEYWORDS[currentStage] ? currentStage : "approach";
   const hasStageKeyword = STAGE_KEYWORDS[stage].some((keyword) => lower.includes(keyword));
   const hasQuestionOrHint = /\?|hint|consider|try|focus|walk me through|what if|how would|can you/.test(lower);
+  const hasInterviewerTone = /\b(hmm|okay|interesting|right|makes sense|close|not exactly|let's stay|quick check)\b/.test(lower);
 
-  return hasStageKeyword || hasQuestionOrHint;
+  return hasStageKeyword || hasQuestionOrHint || hasInterviewerTone;
 };
 
 const extractGeminiText = (payload) => {
@@ -281,7 +281,7 @@ const generateWithGemini = async (prompt) => {
   const endpoint = trimmedBaseUrl.endsWith("/models")
     ? `${trimmedBaseUrl}/${geminiModel}:generateContent`
     : `${trimmedBaseUrl}/models/${geminiModel}:generateContent`;
-    console.log("Gemini API endpoint:", endpoint);
+
   const response = await axios.post(
     endpoint,
     {
@@ -297,11 +297,9 @@ const generateWithGemini = async (prompt) => {
       headers: {
         "Content-Type": "application/json",
       },
-      timeout: 20000,
+      timeout: 30000,
     }
   );
-  console.log(response.data);
-
   return extractGeminiText(response.data);
 };
 
@@ -337,6 +335,8 @@ const generateInterviewerMessage = async ({
   retryCount = 0,
   isSessionStart = false,
 }) => {
+  const providerErrors = [];
+
   const prompt = buildInterviewerPrompt({
     problemStatement: clampText(problemStatement, MAX_PROBLEM_CHARS),
     conversationHistory: clampText(conversationHistory, MAX_HISTORY_CHARS),
@@ -359,7 +359,6 @@ const generateInterviewerMessage = async ({
   }
   if (geminiApiKey) {
     try {
-      console.log("Calling Gemini with prompt:", prompt);
       const message = await generateWithGemini(prompt);
       if (message) {
         const sanitized = sanitizeInterviewerMessage(message);
