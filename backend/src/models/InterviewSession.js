@@ -21,6 +21,47 @@ const interviewMessageSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const complexitySnapshotSchema = new mongoose.Schema(
+  {
+    userSolution: {
+      type: String,
+      default: "",
+      maxlength: 8000,
+      trim: true,
+    },
+    userComplexity: {
+      time: { type: String, default: "Unknown" },
+      space: { type: String, default: "Unknown" },
+      confidence: { type: Number, min: 0, max: 1, default: 0 },
+      rationale: { type: String, default: "" },
+    },
+    optimalComplexity: {
+      time: { type: String, default: "Unknown" },
+      space: { type: String, default: "Unknown" },
+      source: {
+        type: String,
+        enum: ["problem_data", "ai_generated"],
+        default: "ai_generated",
+      },
+      rationale: { type: String, default: "" },
+    },
+    comparison: {
+      verdict: {
+        type: String,
+        enum: ["better", "equal", "worse", "unknown"],
+        default: "unknown",
+      },
+      summary: { type: String, default: "" },
+      recommendation: { type: String, default: "" },
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  { _id: false }
+);
+
 const interviewSessionSchema = new mongoose.Schema(
   {
     userId: {
@@ -39,6 +80,10 @@ const interviewSessionSchema = new mongoose.Schema(
       type: [interviewMessageSchema],
       default: [],
     },
+    complexityComparisons: {
+      type: [complexitySnapshotSchema],
+      default: [],
+    },
     currentStage: {
       type: String,
       enum: ["approach", "complexity", "edge_cases", "optimization", "coding"],
@@ -52,6 +97,7 @@ const interviewSessionSchema = new mongoose.Schema(
       struggleCount: { type: Number, default: 0 },
       stageMastery: { type: Number, default: 0 },
       userStuck: { type: Boolean, default: false },
+      lastComplexityComparedAt: { type: Date, default: null },
       turn: { type: Number, default: 0 },
       lastInterviewerQuestion: { type: String, default: "" },
     },

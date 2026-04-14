@@ -32,6 +32,23 @@ const problemSchema = new mongoose.Schema({
     type: String,
     default: "",
   },
+  optimalComplexity: {
+    time: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    space: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    notes: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+  },
   tags: [{ type: String, index: true }],
 
   testCases: [

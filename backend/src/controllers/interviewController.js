@@ -2,6 +2,7 @@ const asyncHandler = require("../utils/asyncHandler");
 const {
   startInterviewSession,
   respondInterviewSession,
+  compareInterviewSessionComplexity,
   getInterviewSession,
   getInterviewSessionMessages,
 } = require("../services/interviewService");
@@ -20,6 +21,16 @@ const respondInterview = asyncHandler(async (req, res) => {
     userId: req.user._id,
     sessionId: req.body.sessionId,
     userMessage: req.body.userMessage,
+  });
+
+  res.json(data);
+});
+
+const compareInterviewComplexity = asyncHandler(async (req, res) => {
+  const data = await compareInterviewSessionComplexity({
+    userId: req.user._id,
+    sessionId: req.body.sessionId,
+    userSolution: req.body.userSolution,
   });
 
   res.json(data);
@@ -50,6 +61,7 @@ const getInterviewMessages = asyncHandler(async (req, res) => {
 module.exports = {
   startInterview,
   respondInterview,
+  compareInterviewComplexity,
   getInterviewById,
   getInterviewMessages,
 };

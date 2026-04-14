@@ -12,6 +12,11 @@ const respondInterviewSchema = z.object({
   userMessage: z.string().trim().min(1).max(2000),
 });
 
+const compareInterviewComplexitySchema = z.object({
+  sessionId: objectId,
+  userSolution: z.string().trim().min(1).max(8000).optional(),
+});
+
 const interviewSessionParamsSchema = z.object({
   sessionId: objectId,
 });
@@ -24,6 +29,7 @@ const interviewMessagesQuerySchema = z.object({
 module.exports = {
   startInterviewSchema,
   respondInterviewSchema,
+  compareInterviewComplexitySchema,
   interviewSessionParamsSchema,
   interviewMessagesQuerySchema,
 };

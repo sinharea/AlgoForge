@@ -4,6 +4,12 @@ const { DIFFICULTY } = require("../constants");
 const objectIdRegex = /^[a-fA-F0-9]{24}$/;
 const objectId = z.string().regex(objectIdRegex, "Invalid ObjectId");
 
+const optimalComplexitySchema = z.object({
+  time: z.string().trim().max(80).optional(),
+  space: z.string().trim().max(80).optional(),
+  notes: z.string().trim().max(2000).optional(),
+});
+
 const adminProblemCreateSchema = z.object({
   questionNumber: z.number().int().positive().optional(),
   title: z.string().trim().min(3).max(200),
@@ -13,6 +19,7 @@ const adminProblemCreateSchema = z.object({
   tags: z.array(z.string().trim().min(1).max(40)).max(20).default([]),
   constraints: z.string().trim().max(5000).optional(),
   editorialSolution: z.string().trim().max(100000).optional(),
+  optimalComplexity: optimalComplexitySchema.optional(),
   timeLimit: z.number().int().positive().max(10000).default(2000),
   memoryLimit: z.number().int().positive().max(1024).default(128),
 });

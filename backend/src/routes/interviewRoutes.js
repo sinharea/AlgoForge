@@ -4,12 +4,14 @@ const validate = require("../middleware/validate");
 const {
   startInterviewSchema,
   respondInterviewSchema,
+  compareInterviewComplexitySchema,
   interviewSessionParamsSchema,
   interviewMessagesQuerySchema,
 } = require("../validators/interviewValidator");
 const {
   startInterview,
   respondInterview,
+  compareInterviewComplexity,
   getInterviewById,
   getInterviewMessages,
 } = require("../controllers/interviewController");
@@ -20,6 +22,7 @@ router.use(auth);
 
 router.post("/start", validate(startInterviewSchema), startInterview);
 router.post("/respond", validate(respondInterviewSchema), respondInterview);
+router.post("/compare", validate(compareInterviewComplexitySchema), compareInterviewComplexity);
 router.get(
   "/:sessionId/messages",
   validate(interviewSessionParamsSchema, "params"),

@@ -8,7 +8,7 @@ import toast from "react-hot-toast";
 import { clsx } from "clsx";
 import { Clock, Tag, Copy, Check, BookOpen, FileCode, TestTube, CheckCircle2, XCircle, AlertTriangle, Loader2, ShieldCheck, Hash, Scale } from "lucide-react";
 import { problemApi, RunResult } from "@/src/api/problemApi";
-import { interviewApi } from "@/src/api/interviewApi";
+import { interviewApi, InterviewComplexityComparison } from "@/src/api/interviewApi";
 import CodePlayground from "@/src/features/editor/CodePlayground";
 import { EditorSkeleton } from "@/src/components/ui/Skeleton";
 import ErrorState from "@/src/components/ui/ErrorState";
@@ -115,6 +115,8 @@ export default function ProblemDetailPage() {
   const [submissionFilter, setSubmissionFilter] = useState<"all" | "Accepted" | "Wrong Answer" | "Runtime Error" | "Compilation Error" | "other">("all");
   const [copiedSubmissionCode, setCopiedSubmissionCode] = useState(false);
   const [languageInitialized, setLanguageInitialized] = useState(false);
+  const [latestComplexityComparison, setLatestComplexityComparison] = useState<InterviewComplexityComparison | null>(null);
+  const [activeInterviewSessionId, setActiveInterviewSessionId] = useState<string | null>(null);
 
   // Load saved code from localStorage on mount and when slug/language changes
   useEffect(() => {
@@ -213,11 +215,48 @@ export default function ProblemDetailPage() {
       return (await interviewApi.start({ problemId: problemQuery.data._id })).data;
     },
     onSuccess: (data) => {
+      setActiveInterviewSessionId(data.sessionId);
       toast.success("Interview session started");
       router.push(`/interview/${data.sessionId}`);
     },
     onError: (error: any) => {
       const errorMsg = error?.response?.data?.error?.message || error?.message || "Unable to start interview";
+      toast.error(errorMsg);
+    },
+  });
+
+  const compareComplexityMutation = useMutation({
+    mutationFn: async () => {
+      if (!problemQuery.data?._id) {
+        throw new Error("Problem not ready yet");
+      }
+
+      const startResponse = await interviewApi.start({ problemId: problemQuery.data._id });
+      const sessionId = startResponse.data.sessionId;
+      const normalizedSolution = String(code || "").trim();
+      const comparePayload = normalizedSolution
+        ? { sessionId, userSolution: normalizedSolution }
+        : { sessionId };
+
+      const compareResponse = await interviewApi.compare(comparePayload);
+
+      return {
+        sessionId,
+        ...compareResponse.data,
+      };
+    },
+    onSuccess: (data) => {
+      setActiveInterviewSessionId(data.sessionId);
+      const nextComparison = data.latestComplexityComparison || data.comparison || null;
+      setLatestComplexityComparison(nextComparison);
+      toast.success("Complexity comparison ready. Continue follow-up in interview chat.");
+    },
+    onError: (error: any) => {
+      const errorMsg =
+        error?.response?.data?.error?.message ||
+        error?.response?.data?.message ||
+        error?.message ||
+        "Unable to compare complexity";
       toast.error(errorMsg);
     },
   });
@@ -306,6 +345,37 @@ export default function ProblemDetailPage() {
     const submittedCode = selectedSubmissionQuery.data?.code || "";
     return buildCodeDiff(submittedCode, code || "");
   }, [selectedSubmissionQuery.data?.code, code]);
+
+  const comparisonVerdictMeta = useMemo(() => {
+    if (!latestComplexityComparison) {
+      return null;
+    }
+
+    const verdict = latestComplexityComparison.comparison.verdict;
+    if (verdict === "equal") {
+      return {
+        label: "Matches Optimal",
+        className: "bg-emerald-500/15 text-emerald-200 border-emerald-400/40",
+      };
+    }
+    if (verdict === "better") {
+      return {
+        label: "Better Than Baseline",
+        className: "bg-cyan-500/15 text-cyan-200 border-cyan-400/40",
+      };
+    }
+    if (verdict === "worse") {
+      return {
+        label: "Needs Optimization",
+        className: "bg-amber-500/15 text-amber-200 border-amber-400/40",
+      };
+    }
+
+    return {
+      label: "Uncertain",
+      className: "bg-slate-500/10 text-slate-200 border-slate-500/30",
+    };
+  }, [latestComplexityComparison]);
 
   useEffect(() => {
     if (!slug || languageInitialized || !submissionsQuery.isFetched) return;
@@ -786,9 +856,11 @@ export default function ProblemDetailPage() {
             setCode={handleCodeChange}
             setLanguage={handleLanguageChange}
             onStartInterview={() => startInterviewMutation.mutate()}
+            onCompareComplexity={() => compareComplexityMutation.mutate()}
             onSubmit={() => submissionMutation.mutate()}
             onRun={() => runMutation.mutate()}
             interviewStarting={startInterviewMutation.isPending}
+            comparingComplexity={compareComplexityMutation.isPending}
             submitting={submissionMutation.isPending}
             running={runMutation.isPending}
             result={result}
@@ -801,6 +873,69 @@ export default function ProblemDetailPage() {
             customInput={customInput}
             setCustomInput={setCustomInput}
           />
+
+          {latestComplexityComparison && comparisonVerdictMeta ? (
+            <div className="mt-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-4">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h2 className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+                  <Scale className="h-4 w-4 text-[var(--accent-secondary)]" />
+                  Complexity Comparison
+                </h2>
+                <span className={`rounded-full border px-3 py-1 text-xs font-medium ${comparisonVerdictMeta.className}`}>
+                  {comparisonVerdictMeta.label}
+                </span>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/10 p-3">
+                  <p className="text-xs uppercase tracking-wide text-cyan-200/80">Your Complexity (AI)</p>
+                  <p className="mt-2 text-sm text-cyan-100">
+                    Time: <span className="font-semibold">{latestComplexityComparison.userComplexity.time}</span>
+                  </p>
+                  <p className="text-sm text-cyan-100">
+                    Space: <span className="font-semibold">{latestComplexityComparison.userComplexity.space}</span>
+                  </p>
+                  <p className="mt-1 text-xs text-cyan-200/80">
+                    Confidence: {Math.round((latestComplexityComparison.userComplexity.confidence || 0) * 100)}%
+                  </p>
+                </div>
+
+                <div className="rounded-lg border border-violet-500/20 bg-violet-500/10 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs uppercase tracking-wide text-violet-200/80">Optimal Complexity</p>
+                    <span className="rounded-full border border-violet-400/30 bg-violet-500/10 px-2 py-0.5 text-[10px] text-violet-100/90">
+                      {latestComplexityComparison.optimalComplexity.source === "problem_data"
+                        ? "from problem data"
+                        : "from AI"}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm text-violet-100">
+                    Time: <span className="font-semibold">{latestComplexityComparison.optimalComplexity.time}</span>
+                  </p>
+                  <p className="text-sm text-violet-100">
+                    Space: <span className="font-semibold">{latestComplexityComparison.optimalComplexity.space}</span>
+                  </p>
+                </div>
+              </div>
+
+              <p className="mt-3 text-sm text-[var(--text-secondary)]">
+                {latestComplexityComparison.comparison.summary || "No summary available."}
+              </p>
+              {latestComplexityComparison.comparison.recommendation ? (
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  Recommendation: {latestComplexityComparison.comparison.recommendation}
+                </p>
+              ) : null}
+
+              {activeInterviewSessionId ? (
+                <div className="mt-3">
+                  <Link href={`/interview/${activeInterviewSessionId}`} className="btn btn-secondary">
+                    Continue in Interview Prompt Box
+                  </Link>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

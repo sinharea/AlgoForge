@@ -5,6 +5,7 @@ const { interviewLastNChats, interviewChatPageSize } = require("../config/env");
 const {
   formatConversationHistory,
   generateInterviewerMessage,
+  generateComplexityComparison,
 } = require("./interviewLlmService");
 
 const STUCK_PATTERN = /\b(stuck|hint|help|confused|no idea|don't know|dont know|unclear)\b/i;
@@ -228,6 +229,77 @@ const formatProblemStatement = (problem) => {
   ].join("\n\n");
 };
 
+const formatProblemForComplexityComparison = (problem) => {
+  const optimalTime = String(problem?.optimalComplexity?.time || "").trim();
+  const optimalSpace = String(problem?.optimalComplexity?.space || "").trim();
+  const optimalNotes = String(problem?.optimalComplexity?.notes || "").trim();
+
+  return [
+    `Title: ${problem.title}`,
+    `Difficulty: ${problem.difficulty}`,
+    `Tags: ${(problem.tags || []).join(", ") || "N/A"}`,
+    "Description:",
+    trimText(problem.description || "", 2600),
+    "Constraints:",
+    trimText(problem.constraints || "N/A", 1000),
+    "Optimal complexity metadata:",
+    `Time: ${optimalTime || "Unknown"}`,
+    `Space: ${optimalSpace || "Unknown"}`,
+    `Notes: ${optimalNotes || "N/A"}`,
+  ].join("\n\n");
+};
+
+const normalizeComplexityValue = (value, fallback = "Unknown") => {
+  const text = String(value || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!text) return fallback;
+  return text.length > 90 ? `${text.slice(0, 90)}...` : text;
+};
+
+const getRecentUserSolution = (messages = [], maxMessages = 5) => {
+  const recentUserMessages = messages
+    .filter((message) => message.role === "user")
+    .slice(-maxMessages)
+    .map((message) => String(message.content || "").trim())
+    .filter(Boolean);
+
+  return recentUserMessages.join("\n\n").trim();
+};
+
+const MAX_COMPLEXITY_HISTORY = 20;
+
+const mapComplexitySnapshot = (snapshot) => {
+  if (!snapshot) return null;
+
+  return {
+    userSolution: normalizeComplexityValue(snapshot.userSolution, ""),
+    userComplexity: {
+      time: normalizeComplexityValue(snapshot.userComplexity?.time),
+      space: normalizeComplexityValue(snapshot.userComplexity?.space),
+      confidence: Number(snapshot.userComplexity?.confidence || 0),
+      rationale: normalizeComplexityValue(snapshot.userComplexity?.rationale, ""),
+    },
+    optimalComplexity: {
+      time: normalizeComplexityValue(snapshot.optimalComplexity?.time),
+      space: normalizeComplexityValue(snapshot.optimalComplexity?.space),
+      source:
+        snapshot.optimalComplexity?.source === "problem_data"
+          ? "problem_data"
+          : "ai_generated",
+      rationale: normalizeComplexityValue(snapshot.optimalComplexity?.rationale, ""),
+    },
+    comparison: {
+      verdict: ["better", "equal", "worse", "unknown"].includes(snapshot.comparison?.verdict)
+        ? snapshot.comparison.verdict
+        : "unknown",
+      summary: normalizeComplexityValue(snapshot.comparison?.summary, ""),
+      recommendation: normalizeComplexityValue(snapshot.comparison?.recommendation, ""),
+    },
+    createdAt: snapshot.createdAt,
+  };
+};
+
 const MAX_CHAT_PAGE_SIZE = 100;
 
 const resolvePageSize = (value) => {
@@ -277,6 +349,10 @@ const paginateMessages = (messages = [], { beforeIndex, limit } = {}) => {
 
 const toSessionResponse = (session, problem, pageOptions = {}) => {
   const paged = paginateMessages(session.messages, pageOptions);
+  const latestComplexityComparison =
+    session.complexityComparisons?.length > 0
+      ? mapComplexitySnapshot(session.complexityComparisons[session.complexityComparisons.length - 1])
+      : null;
 
   return {
     sessionId: session._id,
@@ -288,6 +364,7 @@ const toSessionResponse = (session, problem, pageOptions = {}) => {
     },
     messages: paged.messages,
     pagination: paged.pagination,
+    latestComplexityComparison,
     currentStage: normalizeStage(session.currentStage || session.currentState?.currentStage),
     currentState: session.currentState,
     createdAt: session.createdAt,
@@ -558,6 +635,103 @@ const respondInterviewSession = async ({ userId, sessionId, userMessage }) => {
   };
 };
 
+const compareInterviewSessionComplexity = async ({ userId, sessionId, userSolution }) => {
+  const session = await InterviewSession.findById(sessionId).populate(
+    "problemId",
+    "title slug difficulty tags description constraints sampleTestCases editorialSolution optimalComplexity"
+  );
+
+  if (!session) {
+    throw ApiError.notFound("Interview session not found");
+  }
+
+  if (String(session.userId) !== String(userId)) {
+    throw ApiError.forbidden("You can only access your own interview sessions");
+  }
+
+  if (!session.problemId) {
+    throw ApiError.notFound("Problem not found for this interview session");
+  }
+
+  const normalizedProvidedSolution = String(userSolution || "").trim();
+  const derivedSolution = getRecentUserSolution(session.messages, 5);
+  const solutionToEvaluate = normalizedProvidedSolution || derivedSolution;
+
+  if (!solutionToEvaluate) {
+    throw ApiError.badRequest("Add your approach or code first, then compare complexity");
+  }
+
+  const providedOptimalTime = String(session.problemId?.optimalComplexity?.time || "").trim();
+  const providedOptimalSpace = String(session.problemId?.optimalComplexity?.space || "").trim();
+
+  const generated = await generateComplexityComparison({
+    problemStatement: formatProblemForComplexityComparison(session.problemId),
+    editorialSolution: trimText(session.problemId?.editorialSolution || "", 3200),
+    userSolution: trimText(solutionToEvaluate, 7800),
+    providedOptimalTime,
+    providedOptimalSpace,
+  });
+
+  const snapshot = {
+    userSolution: trimText(solutionToEvaluate, 7800),
+    userComplexity: {
+      time: normalizeComplexityValue(generated.userComplexity?.time),
+      space: normalizeComplexityValue(generated.userComplexity?.space),
+      confidence: Math.max(0, Math.min(1, Number(generated.userComplexity?.confidence || 0))),
+      rationale: normalizeComplexityValue(generated.userComplexity?.rationale, ""),
+    },
+    optimalComplexity: {
+      time: normalizeComplexityValue(generated.optimalComplexity?.time),
+      space: normalizeComplexityValue(generated.optimalComplexity?.space),
+      source:
+        generated.optimalComplexity?.source === "problem_data"
+          ? "problem_data"
+          : "ai_generated",
+      rationale: normalizeComplexityValue(generated.optimalComplexity?.rationale, ""),
+    },
+    comparison: {
+      verdict: ["better", "equal", "worse", "unknown"].includes(generated.comparison?.verdict)
+        ? generated.comparison.verdict
+        : "unknown",
+      summary: normalizeComplexityValue(generated.comparison?.summary, ""),
+      recommendation: normalizeComplexityValue(generated.comparison?.recommendation, ""),
+    },
+    createdAt: new Date(),
+  };
+
+  const existingComparisons = Array.isArray(session.complexityComparisons)
+    ? session.complexityComparisons
+    : [];
+  session.complexityComparisons = [...existingComparisons, snapshot].slice(-MAX_COMPLEXITY_HISTORY);
+
+  if (!session.currentState) {
+    session.currentState = {
+      phase: "active",
+      hintsGiven: 0,
+      stuckCount: 0,
+      struggleCount: 0,
+      stageMastery: 0,
+      userStuck: false,
+      turn: 0,
+      lastInterviewerQuestion: "",
+      lastComplexityComparedAt: new Date(),
+    };
+  } else {
+    session.currentState.lastComplexityComparedAt = new Date();
+  }
+
+  await session.save();
+
+  return {
+    sessionId: session._id,
+    comparison: mapComplexitySnapshot(snapshot),
+    comparisons: session.complexityComparisons
+      .slice(-5)
+      .map((item) => mapComplexitySnapshot(item)),
+    latestComplexityComparison: mapComplexitySnapshot(snapshot),
+  };
+};
+
 const getInterviewSession = async ({ userId, sessionId, beforeIndex, limit }) => {
   const session = await InterviewSession.findById(sessionId).populate(
     "problemId",
@@ -604,6 +778,7 @@ const getInterviewSessionMessages = async ({ userId, sessionId, beforeIndex, lim
 module.exports = {
   startInterviewSession,
   respondInterviewSession,
+  compareInterviewSessionComplexity,
   getInterviewSession,
   getInterviewSessionMessages,
 };

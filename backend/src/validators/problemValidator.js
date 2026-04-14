@@ -6,6 +6,12 @@ const testCaseSchema = z.object({
   expectedOutput: z.string(),
 });
 
+const optimalComplexitySchema = z.object({
+  time: z.string().trim().max(80).optional(),
+  space: z.string().trim().max(80).optional(),
+  notes: z.string().trim().max(2000).optional(),
+});
+
 const createProblemSchema = z.object({
   questionNumber: z.number().int().positive().optional(),
   title: z.string().min(3).max(200),
@@ -19,6 +25,7 @@ const createProblemSchema = z.object({
   tags: z.array(z.string().min(1)).default([]),
   constraints: z.string().optional(),
   editorialSolution: z.string().max(100000).optional(),
+  optimalComplexity: optimalComplexitySchema.optional(),
   testCases: z.array(testCaseSchema).min(1),
   sampleTestCases: z.array(testCaseSchema).default([]),
   timeLimit: z.number().int().positive().max(10000).default(2000),

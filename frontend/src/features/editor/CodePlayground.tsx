@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
+  Scale,
   AlertTriangle,
   Send,
   Mic,
@@ -33,9 +34,11 @@ type Props = {
   setCode: (value: string) => void;
   setLanguage: (value: string) => void;
   onStartInterview?: () => void;
+  onCompareComplexity?: () => void;
   onSubmit: () => void;
   onRun: () => void;
   interviewStarting?: boolean;
+  comparingComplexity?: boolean;
   submitting: boolean;
   running: boolean;
   result?: {
@@ -154,9 +157,11 @@ export default function CodePlayground({
   setCode,
   setLanguage,
   onStartInterview,
+  onCompareComplexity,
   onSubmit,
   onRun,
   interviewStarting = false,
+  comparingComplexity = false,
   submitting,
   running,
   result,
@@ -422,6 +427,25 @@ export default function CodePlayground({
                 <>
                   <Mic className="h-4 w-4" />
                   🎤 Start Interview
+                </>
+              )}
+            </button>
+          ) : null}
+          {onCompareComplexity ? (
+            <button
+              onClick={onCompareComplexity}
+              disabled={comparingComplexity || interviewStarting || submitting || running}
+              className="btn btn-secondary whitespace-nowrap"
+            >
+              {comparingComplexity ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Comparing...
+                </>
+              ) : (
+                <>
+                  <Scale className="h-4 w-4" />
+                  Compare
                 </>
               )}
             </button>

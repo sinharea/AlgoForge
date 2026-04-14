@@ -300,7 +300,8 @@ const getOpenRouterClient = async () => {
   return openRouterClientPromise;
 };
 
-const generateWithGemini = async (prompt) => {
+const generateWithGemini = async (prompt, options = {}) => {
+  const maxOutputTokens = Number(options.maxOutputTokens) > 0 ? Number(options.maxOutputTokens) : 120;
   const trimmedBaseUrl = String(geminiBaseUrl || "").replace(/\/+$/, "");
   const endpoint = trimmedBaseUrl.endsWith("/models")
     ? `${trimmedBaseUrl}/${geminiModel}:generateContent`
@@ -313,7 +314,7 @@ const generateWithGemini = async (prompt) => {
       generationConfig: {
         temperature: LLM_TEMPERATURE,
         topP: LLM_TOP_P,
-        maxOutputTokens: 120,
+        maxOutputTokens,
       },
     },
     {
@@ -327,7 +328,8 @@ const generateWithGemini = async (prompt) => {
   return extractGeminiText(response.data);
 };
 
-const generateWithOpenAi = async (prompt) => {
+const generateWithOpenAi = async (prompt, options = {}) => {
+  const maxTokens = Number(options.maxTokens) > 0 ? Number(options.maxTokens) : 140;
   const openrouter = await getOpenRouterClient();
   const response = await openrouter.chat.send({
     chatRequest: {
@@ -335,7 +337,7 @@ const generateWithOpenAi = async (prompt) => {
       messages: [{ role: "user", content: prompt }],
       temperature: LLM_TEMPERATURE,
       topP: LLM_TOP_P,
-      maxTokens: 140,
+      maxTokens,
       stream: false,
     },
   });
@@ -430,8 +432,246 @@ const generateInterviewerMessage = async ({
   });
 };
 
+const normalizeComplexityText = (value, fallback = "Unknown") => {
+  const text = String(value || "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!text) return fallback;
+  if (/^(unknown|n\/?a|not sure|unclear|cannot determine|can't determine)$/i.test(text)) {
+    return "Unknown";
+  }
+
+  return clampText(text, 90);
+};
+
+const parseJsonObject = (value) => {
+  const text = String(value || "").trim();
+  if (!text) return null;
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    const first = text.indexOf("{");
+    const last = text.lastIndexOf("}");
+    if (first === -1 || last <= first) return null;
+    try {
+      return JSON.parse(text.slice(first, last + 1));
+    } catch {
+      return null;
+    }
+  }
+};
+
+const normalizeComplexityComparison = ({
+  parsed,
+  providedOptimalTime,
+  providedOptimalSpace,
+}) => {
+  const safe = parsed && typeof parsed === "object" ? parsed : {};
+  const userComplexity = safe.userComplexity && typeof safe.userComplexity === "object"
+    ? safe.userComplexity
+    : {};
+  const optimalComplexity = safe.optimalComplexity && typeof safe.optimalComplexity === "object"
+    ? safe.optimalComplexity
+    : {};
+  const comparison = safe.comparison && typeof safe.comparison === "object"
+    ? safe.comparison
+    : {};
+
+  const normalizedProvidedTime = normalizeComplexityText(providedOptimalTime || "", "");
+  const normalizedProvidedSpace = normalizeComplexityText(providedOptimalSpace || "", "");
+  const hasProvidedOptimal = Boolean(normalizedProvidedTime || normalizedProvidedSpace);
+
+  const verdictRaw = String(comparison.verdict || "").toLowerCase();
+  const verdict = ["better", "equal", "worse", "unknown"].includes(verdictRaw)
+    ? verdictRaw
+    : "unknown";
+
+  const confidenceValue = Number(userComplexity.confidence);
+  const confidence = Number.isFinite(confidenceValue)
+    ? Math.max(0, Math.min(1, confidenceValue))
+    : 0;
+
+  const userTime = normalizeComplexityText(userComplexity.time, "Unknown");
+  const userSpace = normalizeComplexityText(userComplexity.space, "Unknown");
+  const optimalTime = normalizedProvidedTime || normalizeComplexityText(optimalComplexity.time, "Unknown");
+  const optimalSpace = normalizedProvidedSpace || normalizeComplexityText(optimalComplexity.space, "Unknown");
+
+  const sourceRaw = String(optimalComplexity.source || "").toLowerCase();
+  const source = hasProvidedOptimal
+    ? "problem_data"
+    : sourceRaw === "problem_data"
+      ? "problem_data"
+      : "ai_generated";
+
+  return {
+    userComplexity: {
+      time: userTime,
+      space: userSpace,
+      confidence,
+      rationale: clampText(userComplexity.rationale || "", 420),
+    },
+    optimalComplexity: {
+      time: optimalTime,
+      space: optimalSpace,
+      source,
+      rationale: clampText(optimalComplexity.rationale || "", 420),
+    },
+    comparison: {
+      verdict,
+      summary: clampText(comparison.summary || "", 420),
+      recommendation: clampText(comparison.recommendation || "", 420),
+    },
+  };
+};
+
+const buildComplexityComparisonPrompt = ({
+  problemStatement,
+  editorialSolution,
+  userSolution,
+  providedOptimalTime,
+  providedOptimalSpace,
+}) => `You are an expert algorithm interviewer.
+
+Task:
+1) Infer the user's time and space complexity from their code/explanation.
+2) Provide the optimal time and space complexity.
+3) Compare user vs optimal.
+
+Problem:
+${problemStatement}
+
+Editorial / reference (may be empty):
+${editorialSolution || "N/A"}
+
+User solution / explanation:
+${userSolution}
+
+Known optimal complexity from problem metadata:
+- time: ${providedOptimalTime || "UNKNOWN"}
+- space: ${providedOptimalSpace || "UNKNOWN"}
+
+Rules:
+- If problem metadata provides a non-UNKNOWN optimal time/space, keep that exact value.
+- If user solution is unclear, mark user complexity as "Unknown" and confidence <= 0.35.
+- Use standard Big-O notation like O(n), O(n log n), O(1).
+- Be strict and realistic, do not assume the user is correct.
+
+Return ONLY valid JSON with this exact shape:
+{
+  "userComplexity": {
+    "time": "string",
+    "space": "string",
+    "confidence": 0.0,
+    "rationale": "string"
+  },
+  "optimalComplexity": {
+    "time": "string",
+    "space": "string",
+    "source": "problem_data|ai_generated",
+    "rationale": "string"
+  },
+  "comparison": {
+    "verdict": "better|equal|worse|unknown",
+    "summary": "string",
+    "recommendation": "string"
+  }
+}`;
+
+const generateComplexityComparison = async ({
+  problemStatement,
+  editorialSolution,
+  userSolution,
+  providedOptimalTime,
+  providedOptimalSpace,
+}) => {
+  const fallback = normalizeComplexityComparison({
+    parsed: {
+      userComplexity: {
+        time: "Unknown",
+        space: "Unknown",
+        confidence: 0,
+        rationale: "Could not reliably infer complexity from the provided answer.",
+      },
+      optimalComplexity: {
+        time: providedOptimalTime || "Unknown",
+        space: providedOptimalSpace || "Unknown",
+        source: providedOptimalTime || providedOptimalSpace ? "problem_data" : "ai_generated",
+        rationale:
+          providedOptimalTime || providedOptimalSpace
+            ? "Using complexity from problem metadata."
+            : "Optimal complexity was not available in metadata.",
+      },
+      comparison: {
+        verdict: "unknown",
+        summary: "Unable to confidently compare user and optimal complexity.",
+        recommendation:
+          "Provide more concrete algorithm steps, loops, recursion depth, and auxiliary data structures.",
+      },
+    },
+    providedOptimalTime,
+    providedOptimalSpace,
+  });
+
+  if (!openaiApiKey && !geminiApiKey) {
+    return fallback;
+  }
+
+  const prompt = buildComplexityComparisonPrompt({
+    problemStatement: clampText(problemStatement, 5200),
+    editorialSolution: clampText(editorialSolution, 3200),
+    userSolution: clampText(userSolution, 5200),
+    providedOptimalTime: normalizeComplexityText(providedOptimalTime || "", ""),
+    providedOptimalSpace: normalizeComplexityText(providedOptimalSpace || "", ""),
+  });
+
+  const providerErrors = [];
+
+  if (openaiApiKey) {
+    try {
+      const output = await generateWithOpenAi(prompt, { maxTokens: 360 });
+      const parsed = parseJsonObject(output);
+      if (parsed) {
+        return normalizeComplexityComparison({
+          parsed,
+          providedOptimalTime,
+          providedOptimalSpace,
+        });
+      }
+      providerErrors.push("OpenAI returned non-JSON complexity output");
+    } catch (error) {
+      providerErrors.push(error.response?.data?.error?.message || error.message);
+    }
+  }
+
+  if (geminiApiKey) {
+    try {
+      const output = await generateWithGemini(prompt, { maxOutputTokens: 360 });
+      const parsed = parseJsonObject(output);
+      if (parsed) {
+        return normalizeComplexityComparison({
+          parsed,
+          providedOptimalTime,
+          providedOptimalSpace,
+        });
+      }
+      providerErrors.push("Gemini returned non-JSON complexity output");
+    } catch (error) {
+      providerErrors.push(error.response?.data?.error?.message || error.message);
+    }
+  }
+
+  logger.warn("Complexity comparison generation failed; using fallback", {
+    error: providerErrors.join(" | ") || "No available provider",
+  });
+
+  return fallback;
+};
+
 module.exports = {
   formatConversationHistory,
   buildInterviewerPrompt,
   generateInterviewerMessage,
+  generateComplexityComparison,
 };
