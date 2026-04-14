@@ -9,11 +9,16 @@ const {
 } = require("../config/env");
 const logger = require("../utils/logger");
 
-const MAX_PROBLEM_CHARS = 4200;
-const MAX_HISTORY_CHARS = 3200;
-const MAX_RESPONSE_CHARS = 320;
-const LLM_TEMPERATURE = 0.15;
-const LLM_TOP_P = 0.3;
+const MAX_PROBLEM_CHARS = 4600;
+const MAX_HISTORY_CHARS = 3600;
+const MAX_USER_ANSWER_CHARS = 700;
+const MAX_RESPONSE_CHARS = 360;
+const LLM_TEMPERATURE = 0.1;
+const LLM_TOP_P = 0.25;
+const DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
+const DEFAULT_OPENROUTER_MODEL = "openai/gpt-oss-120b:free";
+
+let openRouterClientPromise;
 
 const STAGE_KEYWORDS = {
   approach: ["approach", "idea", "intuition", "strategy", "start", "data structure", "hash", "two pointer", "sliding"],
@@ -29,7 +34,7 @@ const clampText = (text = "", maxChars = 1000) => {
   return `${value.slice(0, maxChars)}...`;
 };
 
-const formatConversationHistory = (messages = [], maxMessages = 6) => {
+const formatConversationHistory = (messages = [], maxMessages = 8) => {
   const recent = messages.slice(-maxMessages);
   const lines = recent.map((message) => {
     const speaker = message.role === "user" ? "User" : "Interviewer";
@@ -43,18 +48,17 @@ const buildInterviewerPrompt = ({
   problemStatement,
   conversationHistory,
   currentStage,
+  stageMastery,
   struggleCount,
   answerAssessment,
+  latestUserAnswer,
   avoidQuestion,
-}) => `You are a senior technical interviewer at a top tech company.
+}) => `You are a senior software engineer conducting a realistic live coding interview.
 
-You are conducting a LIVE coding interview.
-
-You are NOT a tutor.
-You are NOT a teacher.
-You are a HUMAN interviewer.
-
--------------------------------------
+Interview mode:
+- Human, concise, direct.
+- Industry-grade technical signal.
+- Never sound scripted, random, or like a tutor.
 
 Problem:
 ${problemStatement}
@@ -62,82 +66,37 @@ ${problemStatement}
 Conversation so far:
 ${conversationHistory}
 
-Current stage:
-${currentStage}
+Candidate's latest answer:
+${clampText(latestUserAnswer || "", MAX_USER_ANSWER_CHARS) || "No answer yet."}
 
-Stage focus guidance (strict):
-- approach: ask about high-level strategy, intuition, and data-structure choice
-- complexity: ask about time/space complexity precisely
-- edge_cases: ask about corner/invalid/boundary inputs
-- optimization: ask for runtime/memory improvement trade-offs
-- coding: ask implementation structure/invariants/checks
+Current interview stage: ${currentStage}
+Stage depth completed in this stage: ${Number(stageMastery || 0)} / 2
+Candidate struggle level: ${struggleCount}
+Candidate answer assessment: ${answerAssessment}
 
-User struggle level:
-${struggleCount}
+Stage focus (strict):
+- approach: core strategy, data-structure choice, why it should work
+- complexity: exact time/space cost and what drives it
+- edge_cases: boundary and failure inputs
+- optimization: practical trade-offs and bottlenecks
+- coding: implementation structure, invariants, and pitfalls
 
-Current user answer quality:
-${answerAssessment}
+Behavior rules:
+1) Start by reacting to the candidate's latest answer naturally.
+2) Then ask exactly one focused follow-up question tied to the stage.
+3) Keep total response to 1-2 short lines, max 45 words.
+4) No generic filler, no motivational talk, no off-topic comments.
+5) Do not repeat previous interviewer wording.
+6) If struggleCount is 2+, include a targeted hint before the follow-up question.
+7) Ask questions that a real interviewer at a strong engineering company would ask.
+8) Never agree with a wrong or unclear answer.
+9) If answerAssessment is "wrong" or "no_answer", challenge directly with mild objection.
+10) If answerAssessment is "partial", acknowledge partial progress but do not confirm correctness.
 
--------------------------------------
+Do not repeat this wording:
+${avoidQuestion || "N/A"}
 
-BEHAVIOR:
-
-1. Speak naturally:
-   - 'hmm', 'okay', 'interesting', 'not quite', 'right'
-   - slightly conversational, not robotic
-
-2. ALWAYS react first:
-   - good -> 'yeah, that makes sense'
-   - partial -> 'you're close...'
-   - wrong -> 'hmm, not exactly...'
-   - no answer -> 'that's okay, let's think about it'
-
-3. NEVER repeat questions.
-
-4. Ask ONE thing at a time.
-
-5. Keep responses SHORT (1-2 lines).
-
--------------------------------------
-
-ADAPTIVE LOGIC:
-
-If user struggles:
-- 1st attempt -> small hint
-- 2nd attempt -> clearer hint
-- 3rd attempt -> move forward
-
-If user says:
-- 'no'
-- 'that's all'
--> challenge lightly OR move forward
-
--------------------------------------
-
-INTERVIEW FLOW:
-
-Approach -> Complexity -> Edge Cases -> Optimization -> Coding
-
-DO NOT mention stages explicitly.
-
--------------------------------------
-
-QUESTION STYLE:
-
-Avoid generic robotic wording.
-Use natural prompts like:
-- "hmm... what happens if the input is empty?"
-- "what if there are duplicates?"
-- "does this still work for large inputs?"
-
-${avoidQuestion ? `Do not repeat this question or wording: ${avoidQuestion}` : ""}
-
--------------------------------------
-
-OUTPUT:
-Return ONLY the next interviewer message.
-No explanations.
-No formatting.`;
+Return only the next interviewer message text. No markdown, no bullets.`;
 
 const reactionMap = {
   correct: "yeah, that makes sense.",
@@ -148,53 +107,54 @@ const reactionMap = {
 
 const stageFallbackQuestions = {
   approach: [
-    "okay, what approach would you start with here, and what's your intuition?",
-    "hmm, what core idea are you going with first?",
+    "okay, walk me through the strategy you'd start with and why it should work.",
+    "hmm, what data structure is central to your approach, and why?",
   ],
   complexity: [
-    "interesting, what does the time and space complexity look like?",
-    "right, what Big-O cost do you expect here?",
+    "interesting, where does most of the runtime come from in your solution?",
+    "right, what's your exact time and space complexity, and why?",
   ],
   edge_cases: [
-    "hmm, what happens if the input is empty?",
-    "okay, what if there are duplicates or very large inputs?",
+    "hmm, which edge case would break your first implementation?",
+    "okay, what happens for empty input, duplicates, or boundary values?",
   ],
   optimization: [
-    "right, can you optimize this further?",
-    "interesting, any trade-off to reduce memory or runtime?",
+    "right, if you had to optimize one bottleneck first, what would it be?",
+    "interesting, what trade-off would you accept for better runtime here?",
   ],
   coding: [
-    "okay, how would you structure the code now?",
-    "right, what checks would you keep while implementing?",
+    "okay, how would you structure the implementation before writing lines of code?",
+    "right, what invariant will you maintain inside your main loop?",
   ],
 };
 
 const stageHintPrompts = {
   approach: {
-    small: "small hint: focus on what data you need at each step.",
-    clear: "clearer hint: think about a structure that gives fast lookup.",
+    small: "small hint: isolate the information you must know before each decision.",
+    clear: "clearer hint: choose a structure that gives predictable lookup/update cost.",
   },
   complexity: {
-    small: "small hint: count work per element and extra storage.",
-    clear: "clearer hint: walk through one pass and track memory growth.",
+    small: "small hint: count work per element, then add setup cost.",
+    clear: "clearer hint: state dominant term and memory growth separately.",
   },
   edge_cases: {
-    small: "small hint: try empty, single, duplicate, and large inputs.",
-    clear: "clearer hint: include boundary values and repeated elements.",
+    small: "small hint: test empty, single, duplicate, and boundary values.",
+    clear: "clearer hint: include invalid order, min/max boundaries, and repeated values.",
   },
   optimization: {
-    small: "small hint: check if a different traversal reduces overhead.",
-    clear: "clearer hint: consider trade-offs between memory and passes.",
+    small: "small hint: identify the hottest section of work first.",
+    clear: "clearer hint: trade memory for fewer passes only if it reduces dominant cost.",
   },
   coding: {
-    small: "small hint: define invariants before writing loops.",
-    clear: "clearer hint: lock down update order and guard conditions first.",
+    small: "small hint: define your loop invariant before implementation details.",
+    clear: "clearer hint: lock update order, guard checks, and exit conditions first.",
   },
 };
 
 const fallbackInterviewerMessage = ({
   isSessionStart,
   currentStage = "approach",
+  stageMastery = 0,
   struggleCount = 0,
   answerAssessment = "partial",
   avoidQuestion,
@@ -214,6 +174,17 @@ const fallbackInterviewerMessage = ({
 
   if (struggleCount === 2) {
     return `${reaction} ${hints.clear}`;
+  }
+
+  if (Number(stageMastery || 0) >= 1 && struggleCount === 0) {
+    const deeper = {
+      approach: "okay, now justify why this approach remains correct across all input patterns?",
+      complexity: "right, which operation dominates your runtime and why?",
+      edge_cases: "hmm, which exact boundary case is most likely to fail first?",
+      optimization: "interesting, what optimization gives the best gain for the least complexity?",
+      coding: "right, what invariant will you enforce at each loop iteration?",
+    };
+    return `${reaction} ${deeper[stage] || deeper.approach}`;
   }
 
   const stagePrompt = stageFallbackQuestions[stage][retryCount % stageFallbackQuestions[stage].length];
@@ -237,6 +208,8 @@ const sanitizeInterviewerMessage = (content) => {
     .replace(/^Next interviewer message:\s*/i, "")
     .replace(/^Only the next interviewer message\.?\s*/i, "")
     .replace(/^Return only the next interviewer message\.?\s*/i, "")
+    .replace(/^\"+|\"+$/g, "")
+    .replace(/\s+/g, " ")
     .trim();
 
   const maxCharsMessage = clampText(cleaned, MAX_RESPONSE_CHARS);
@@ -257,12 +230,14 @@ const isUsableInterviewerMessage = ({ message, currentStage }) => {
   if (text.length < 10) return false;
 
   const lower = text.toLowerCase();
+  if (/as an ai|language model|i cannot assist|i'm unable to/i.test(lower)) return false;
+
   const stage = STAGE_KEYWORDS[currentStage] ? currentStage : "approach";
   const hasStageKeyword = STAGE_KEYWORDS[stage].some((keyword) => lower.includes(keyword));
   const hasQuestionOrHint = /\?|hint|consider|try|focus|walk me through|what if|how would|can you/.test(lower);
   const hasInterviewerTone = /\b(hmm|okay|interesting|right|makes sense|close|not exactly|let's stay|quick check)\b/.test(lower);
 
-  return hasStageKeyword || hasQuestionOrHint || hasInterviewerTone;
+  return hasQuestionOrHint && (hasStageKeyword || hasInterviewerTone);
 };
 
 const extractGeminiText = (payload) => {
@@ -274,6 +249,55 @@ const extractGeminiText = (payload) => {
     .filter(Boolean)
     .join("\n")
     .trim();
+};
+
+const normalizeModelContent = (value) => {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) {
+    return value
+      .map((part) => {
+        if (typeof part === "string") return part;
+        if (typeof part?.text === "string") return part.text;
+        return "";
+      })
+      .filter(Boolean)
+      .join("\n");
+  }
+  return "";
+};
+
+const resolveOpenRouterBaseUrl = () => {
+  const value = String(openaiBaseUrl || "").trim();
+  const isOpenRouterKey = String(openaiApiKey || "").startsWith("sk-or-");
+
+  if (!value) return DEFAULT_OPENROUTER_BASE_URL;
+
+  const normalized = value.replace(/\/+$/, "");
+  const pointsToOpenAi = /api\.openai\.com/i.test(normalized);
+
+  if (isOpenRouterKey && pointsToOpenAi) {
+    return DEFAULT_OPENROUTER_BASE_URL;
+  }
+
+  return normalized;
+};
+
+const resolveOpenRouterModel = () => {
+  const value = String(openaiModel || "").trim();
+  return value || DEFAULT_OPENROUTER_MODEL;
+};
+
+const getOpenRouterClient = async () => {
+  if (openRouterClientPromise) return openRouterClientPromise;
+
+  openRouterClientPromise = import("@openrouter/sdk").then(({ OpenRouter }) =>
+    new OpenRouter({
+      apiKey: openaiApiKey,
+      serverURL: resolveOpenRouterBaseUrl(),
+    })
+  );
+
+  return openRouterClientPromise;
 };
 
 const generateWithGemini = async (prompt) => {
@@ -297,40 +321,36 @@ const generateWithGemini = async (prompt) => {
       headers: {
         "Content-Type": "application/json",
       },
-      timeout: 30000,
+      timeout: 25000,
     }
   );
   return extractGeminiText(response.data);
 };
 
 const generateWithOpenAi = async (prompt) => {
-  const response = await axios.post(
-    `${openaiBaseUrl}/chat/completions`,
-    {
-      model: openaiModel,
-      temperature: LLM_TEMPERATURE,
-      top_p: LLM_TOP_P,
-      max_tokens: 120,
+  const openrouter = await getOpenRouterClient();
+  const response = await openrouter.chat.send({
+    chatRequest: {
+      model: resolveOpenRouterModel(),
       messages: [{ role: "user", content: prompt }],
+      temperature: LLM_TEMPERATURE,
+      topP: LLM_TOP_P,
+      maxTokens: 140,
+      stream: false,
     },
-    {
-      headers: {
-        Authorization: `Bearer ${openaiApiKey}`,
-        "Content-Type": "application/json",
-      },
-      timeout: 20000,
-    }
-  );
+  });
 
-  return response.data?.choices?.[0]?.message?.content;
+  return normalizeModelContent(response?.choices?.[0]?.message?.content).trim();
 };
 
 const generateInterviewerMessage = async ({
   problemStatement,
   conversationHistory,
   currentStage,
+  stageMastery,
   struggleCount,
   answerAssessment,
+  latestUserAnswer,
   avoidQuestion,
   retryCount = 0,
   isSessionStart = false,
@@ -341,8 +361,10 @@ const generateInterviewerMessage = async ({
     problemStatement: clampText(problemStatement, MAX_PROBLEM_CHARS),
     conversationHistory: clampText(conversationHistory, MAX_HISTORY_CHARS),
     currentStage,
+    stageMastery,
     struggleCount,
     answerAssessment,
+    latestUserAnswer,
     avoidQuestion,
   });
 
@@ -351,27 +373,12 @@ const generateInterviewerMessage = async ({
     return fallbackInterviewerMessage({
       isSessionStart,
       currentStage,
+      stageMastery,
       struggleCount,
       answerAssessment,
       avoidQuestion,
       retryCount,
     });
-  }
-  if (geminiApiKey) {
-    try {
-      const message = await generateWithGemini(prompt);
-      if (message) {
-        const sanitized = sanitizeInterviewerMessage(message);
-        if (isUsableInterviewerMessage({ message: sanitized, currentStage })) {
-          return sanitized;
-        }
-        providerErrors.push("Gemini returned low-quality content");
-      } else {
-        providerErrors.push("Gemini returned empty content");
-      }
-    } catch (error) {
-      providerErrors.push(error.response?.data?.error?.message || error.message);
-    }
   }
 
   if (openaiApiKey) {
@@ -391,6 +398,23 @@ const generateInterviewerMessage = async ({
     }
   }
 
+  if (geminiApiKey) {
+    try {
+      const message = await generateWithGemini(prompt);
+      if (message) {
+        const sanitized = sanitizeInterviewerMessage(message);
+        if (isUsableInterviewerMessage({ message: sanitized, currentStage })) {
+          return sanitized;
+        }
+        providerErrors.push("Gemini returned low-quality content");
+      } else {
+        providerErrors.push("Gemini returned empty content");
+      }
+    } catch (error) {
+      providerErrors.push(error.response?.data?.error?.message || error.message);
+    }
+  }
+
   logger.warn("Interview LLM call failed; using fallback", {
     error: providerErrors.join(" | ") || "No available provider",
   });
@@ -398,6 +422,7 @@ const generateInterviewerMessage = async ({
   return fallbackInterviewerMessage({
     isSessionStart,
     currentStage,
+    stageMastery,
     struggleCount,
     answerAssessment,
     avoidQuestion,

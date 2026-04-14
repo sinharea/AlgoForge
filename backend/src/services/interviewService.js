@@ -13,22 +13,15 @@ const END_SIGNAL_PATTERN = /^(no|nope|that's all|thats all|nothing else)$/i;
 const OFF_TOPIC_PATTERN = /\b(who are you|what are you|your name|hello|hi\b|hey\b|how are you|thanks|thank you|bye|good morning|good night)\b/i;
 const INTERVIEW_STAGES = ["approach", "complexity", "edge_cases", "optimization", "coding"];
 
-const APPROACH_PATTERN = /\b(hash|map|set|array|two[-\s]?pointer|sliding\s+window|binary\s+search|dp|dynamic\s+programming|greedy|stack|queue|graph|tree|sort|prefix|backtrack|brute)\b/i;
-const COMPLEXITY_PATTERN = /\b(o\s*\(|time\s*complexity|space\s*complexity|linear|log\s*n|quadratic|constant\s*space|n\s*log\s*n)\b/i;
+const APPROACH_PATTERN = /\b(linked\s*list|pointer|two[-\s]?pointer|prev|curr|next|in[-\s]?place|recurs|iterat|hash|map|set|array|sliding\s+window|binary\s+search|dp|dynamic\s+programming|greedy|stack|queue|graph|sort|prefix|backtrack|brute)\b/i;
+const COMPLEXITY_PATTERN = /\b(o\s*\(|time\s*complexity|space\s*complexity|linear|log\s*n|quadratic|constant\s*space|n\s*log\s*n|n\^2|n\^3|2\^n|e\^n)\b/i;
 const EDGE_PATTERN = /\b(edge|corner|empty|null|single|duplicate|negative|zero|overflow|boundary|large\s*input|one\s*element)\b/i;
 const OPTIMIZATION_PATTERN = /\b(optimi[sz]e|improv|reduce|trade[-\s]?off|cache|memo|in[-\s]?place|precompute|early\s*exit|prune)\b/i;
 const CODING_PATTERN = /\b(code|implement|function|loop|iterate|condition|if\s*\(|pseudo|variable|syntax|compile)\b/i;
+const UNCERTAINTY_PATTERN = /\b(maybe|perhaps|probably|guess|might|could be|i think|can i|should i)\b/i;
+const REASONING_PATTERN = /\b(because|since|therefore|so that|first|then|next|while|by)\b/i;
+const MIN_DETAILED_TOKENS = 9;
 const HINT_PATTERN = /\b(hint|consider|think about|try|focus on|could you)\b/i;
-const HUMAN_OPENERS = [
-  /^hmm\b/i,
-  /^okay\b/i,
-  /^interesting\b/i,
-  /^that makes sense\b/i,
-  /^not quite\b/i,
-  /^yeah,? that makes sense\b/i,
-  /^you're close\b/i,
-  /^that's okay\b/i,
-];
 
 const REACTION_BY_ASSESSMENT = {
   correct: "yeah, that makes sense.",
@@ -36,6 +29,13 @@ const REACTION_BY_ASSESSMENT = {
   wrong: "hmm, not exactly...",
   no_answer: "that's okay, let's think about it.",
 };
+
+const LEADING_REACTION_PATTERN = /^(yeah,?\s*that makes sense|yeah|yes|yep|good|great|exactly|correct|right|that makes sense|you're close,?\s*think about this:?|you're close|hmm,?\s*not exactly|not quite|that's okay,?\s*let'?s think about it|that's okay)[\s,.:!-]*/i;
+
+const stripLeadingReaction = (value = "") =>
+  String(value || "")
+    .replace(LEADING_REACTION_PATTERN, "")
+    .trim();
 
 const trimText = (value = "", max = 1200) => {
   const text = String(value || "").trim();
@@ -88,12 +88,30 @@ const enforceTwoLines = (value = "") =>
 
 const ensureReactionPrefix = (message, assessment) => {
   const text = String(message || "").trim();
-  if (!text) return REACTION_BY_ASSESSMENT.partial;
-  if (HUMAN_OPENERS.some((pattern) => pattern.test(text))) return text;
-  return `${REACTION_BY_ASSESSMENT[assessment] || REACTION_BY_ASSESSMENT.partial} ${text}`;
+  const expectedReaction = REACTION_BY_ASSESSMENT[assessment] || REACTION_BY_ASSESSMENT.partial;
+  if (!text) return expectedReaction;
+
+  const startsPositive = /^(yeah|yes|yep|good|great|exactly|correct|right|that makes sense)\b/i.test(text);
+  const startsPartial = /^you're close\b/i.test(text);
+  const startsWrong = /^(hmm|not quite|i don't think|that doesn't seem right)\b/i.test(text);
+  const startsNoAnswer = /^that's okay\b/i.test(text);
+
+  if (assessment === "correct" && startsPositive) return text;
+  if (assessment === "partial" && startsPartial) return text;
+  if (assessment === "wrong" && startsWrong) return text;
+  if (assessment === "no_answer" && startsNoAnswer) return text;
+
+  const body = stripLeadingReaction(text);
+  return `${expectedReaction} ${body}`.trim();
 };
 
-const stageFallbackQuestion = (stage, assessment = "partial", struggleCount = 0, isEndSignal = false) => {
+const stageFallbackQuestion = (
+  stage,
+  assessment = "partial",
+  struggleCount = 0,
+  isEndSignal = false,
+  stageMastery = 0
+) => {
   const reaction = REACTION_BY_ASSESSMENT[assessment] || REACTION_BY_ASSESSMENT.partial;
 
   if (isEndSignal && struggleCount < 1) {
@@ -113,6 +131,17 @@ const stageFallbackQuestion = (stage, assessment = "partial", struggleCount = 0,
 
   if (struggleCount === 2) {
     return `${reaction} clearer hint: track what information must be available before each decision.`;
+  }
+
+  if (stageMastery >= 1 && struggleCount === 0) {
+    const deepFollowUps = {
+      approach: "nice start. what would make this approach fail, and how would you guard against it?",
+      complexity: "good. where exactly does your biggest cost come from in this approach?",
+      edge_cases: "good catch. which one edge case is most likely to break your first implementation?",
+      optimization: "solid. if you had to optimize only one bottleneck first, which one would you pick?",
+      coding: "good structure. what invariant will you maintain inside your main loop?",
+    };
+    return `${reaction} ${deepFollowUps[normalizeStage(stage)] || deepFollowUps.approach}`;
   }
 
   const prompts = {
@@ -144,7 +173,12 @@ const assessUserResponse = ({ stage, userMessage }) => {
   if (NO_ANSWER_PATTERN.test(text)) return "no_answer";
   if (STUCK_PATTERN.test(text)) return "wrong";
 
-  const isSubstantive = text.length >= 18;
+  const tokenCount = text.split(/\s+/).filter(Boolean).length;
+  const isLowSignal = tokenCount <= 3 || text.length < 10;
+  const isMetaConfirmation = /\b(correct|right|okay|fine|yes|no)\b/i.test(text) && tokenCount <= 5;
+  const hasUncertainty = UNCERTAINTY_PATTERN.test(text);
+  const hasReasoning = REASONING_PATTERN.test(text);
+
   const patternByStage = {
     approach: APPROACH_PATTERN,
     complexity: COMPLEXITY_PATTERN,
@@ -154,9 +188,25 @@ const assessUserResponse = ({ stage, userMessage }) => {
   };
 
   const pattern = patternByStage[normalizeStage(stage)] || APPROACH_PATTERN;
-  if (pattern.test(text) && text.length >= 6) return "correct";
-  if (isSubstantive) return "partial";
-  return "no_answer";
+  const hasStageSignal = pattern.test(text);
+
+  if (isLowSignal || isMetaConfirmation) {
+    return hasStageSignal ? "partial" : "no_answer";
+  }
+
+  if (hasStageSignal && !hasUncertainty) {
+    return "correct";
+  }
+
+  if (hasStageSignal && hasUncertainty) {
+    return "partial";
+  }
+
+  if (tokenCount >= MIN_DETAILED_TOKENS && hasReasoning) {
+    return "partial";
+  }
+
+  return "wrong";
 };
 
 const formatProblemStatement = (problem) => {
@@ -269,6 +319,7 @@ const startInterviewSession = async ({ userId, problemId }) => {
     hintsGiven: 0,
     stuckCount: 0,
     struggleCount: 0,
+    stageMastery: 0,
     userStuck: false,
     turn: 1,
     lastInterviewerQuestion: "",
@@ -280,8 +331,10 @@ const startInterviewSession = async ({ userId, problemId }) => {
     problemStatement: formatProblemStatement(problem),
     conversationHistory: "No prior messages yet.",
     currentStage,
+    stageMastery: 0,
     struggleCount: 0,
     answerAssessment: "no_answer",
+    latestUserAnswer: "",
     isSessionStart: true,
   });
 
@@ -371,16 +424,30 @@ const respondInterviewSession = async ({ userId, sessionId, userMessage }) => {
     ? (session.currentState?.struggleCount ?? session.currentState?.stuckCount ?? 0) + 1
     : Math.max(0, (session.currentState?.struggleCount ?? session.currentState?.stuckCount ?? 0) - 1);
 
+  const currentStageMastery = Number(session.currentState?.stageMastery || 0);
+  let nextStageMastery = currentStageMastery;
+
+  if (!isOffTopic) {
+    if (answerAssessment === "correct") {
+      nextStageMastery = Math.min(currentStageMastery + 1, 2);
+    } else if (answerAssessment === "wrong" || answerAssessment === "no_answer") {
+      nextStageMastery = 0;
+    }
+  }
+
   const forceMoveForward =
     !isOffTopic &&
     ((isStruggleResponse && nextStuckCount >= 3) || (isEndSignal && nextStuckCount >= 1));
+
+  const isReadyToProgress = !isOffTopic && answerAssessment === "correct" && nextStageMastery >= 2;
   const progressedStage =
-    answerAssessment === "correct" || forceMoveForward
+    isReadyToProgress || forceMoveForward
       ? nextStage(resolvedCurrentStage)
       : resolvedCurrentStage;
 
   if (progressedStage !== resolvedCurrentStage) {
     nextStuckCount = 0;
+    nextStageMastery = 0;
   }
 
   session.messages.push({
@@ -394,6 +461,7 @@ const respondInterviewSession = async ({ userId, sessionId, userMessage }) => {
     hintsGiven: session.currentState?.hintsGiven || 0,
     stuckCount: nextStuckCount,
     struggleCount: nextStuckCount,
+    stageMastery: nextStageMastery,
     userStuck: nextStuckCount >= 2,
     turn: (session.currentState?.turn || 0) + 1,
     lastInterviewerQuestion: session.currentState?.lastInterviewerQuestion || "",
@@ -415,15 +483,23 @@ const respondInterviewSession = async ({ userId, sessionId, userMessage }) => {
   if (isOffTopic) {
     interviewerContent = stageRedirectQuestion(progressedStage);
   } else if (mustForceHint) {
-    interviewerContent = stageFallbackQuestion(progressedStage, answerAssessment, nextStuckCount, isEndSignal);
+    interviewerContent = stageFallbackQuestion(
+      progressedStage,
+      answerAssessment,
+      nextStuckCount,
+      isEndSignal,
+      nextStageMastery
+    );
   } else {
     interviewerContent = await generateInterviewerMessage({
       problemStatement: formatProblemStatement(session.problemId),
       conversationHistory: recentConversation,
       currentStage: progressedStage,
+      stageMastery: nextStageMastery,
       struggleCount: nextStuckCount,
       answerAssessment,
       avoidQuestion,
+      latestUserAnswer: normalizedMessage,
     });
   }
 
@@ -432,15 +508,23 @@ const respondInterviewSession = async ({ userId, sessionId, userMessage }) => {
       problemStatement: formatProblemStatement(session.problemId),
       conversationHistory: recentConversation,
       currentStage: progressedStage,
+      stageMastery: nextStageMastery,
       struggleCount: nextStuckCount,
       answerAssessment,
       avoidQuestion,
+      latestUserAnswer: normalizedMessage,
       retryCount: 1,
     });
   }
 
   if (isTooSimilarToAny(interviewerContent, recentInterviewerQuestions)) {
-    interviewerContent = stageFallbackQuestion(progressedStage, answerAssessment, nextStuckCount, isEndSignal);
+    interviewerContent = stageFallbackQuestion(
+      progressedStage,
+      answerAssessment,
+      nextStuckCount,
+      isEndSignal,
+      nextStageMastery
+    );
   }
 
   interviewerContent = ensureReactionPrefix(interviewerContent, answerAssessment);
