@@ -11,6 +11,7 @@ const contestSubmissionSchema = new mongoose.Schema(
     solved: { type: Boolean, default: false, index: true },
     submittedAt: { type: Date, default: Date.now, index: true },
     penaltyMinutes: { type: Number, default: 0 },
+    points: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

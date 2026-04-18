@@ -3,7 +3,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import toast from "react-hot-toast";
 import { clsx } from "clsx";
 import { Clock, Tag, Copy, Check, BookOpen, FileCode, TestTube, CheckCircle2, XCircle, AlertTriangle, Loader2, ShieldCheck, Hash, Scale, Lightbulb, GraduationCap, Sparkles } from "lucide-react";
@@ -118,6 +118,7 @@ export default function ProblemDetailPage() {
   const [latestComplexityComparison, setLatestComplexityComparison] = useState<InterviewComplexityComparison | null>(null);
   const [activeInterviewSessionId, setActiveInterviewSessionId] = useState<string | null>(null);
   const [revealedHintLevel, setRevealedHintLevel] = useState(0);
+  const pageLoadedAt = useRef(Date.now());
 
   // Load saved code from localStorage on mount and when slug/language changes
   useEffect(() => {
@@ -204,6 +205,7 @@ export default function ProblemDetailPage() {
           language,
           code,
           contestId: contestId || undefined,
+          timeTaken: Math.round((Date.now() - pageLoadedAt.current) / 1000),
         })
       ).data,
     onSuccess: (data) => {

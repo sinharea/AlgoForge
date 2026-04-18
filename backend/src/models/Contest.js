@@ -51,6 +51,27 @@ const contestSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    rules: {
+      type: String,
+      default: "",
+    },
+    scoringType: {
+      type: String,
+      enum: ["ICPC", "IOI", "CUSTOM"],
+      default: "ICPC",
+    },
+    maxParticipants: {
+      type: Number,
+    },
+    registeredCount: {
+      type: Number,
+      default: 0,
+    },
+    tags: [{ type: String, trim: true, lowercase: true }],
   },
   { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
 );

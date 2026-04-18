@@ -7,7 +7,7 @@ const { SUBMISSION_STATUS, VERDICTS } = require("../constants");
 const { queueEnabled } = require("../config/env");
 const { ensureContestSubmissionAllowed, trackContestSubmission } = require("../services/contestService");
 const { judgeSubmission, execute, normalize, truncateOutput } = require("../services/executionService");
-const { updateUserTopicAnalytics, updateUserTopicStats } = require("../services/analyticsService");
+const { runPostSubmissionPipeline } = require("../services/analyticsService");
 const { generateCodeReview } = require("../services/codeReviewService");
 const logger = require("../utils/logger");
 
@@ -75,7 +75,7 @@ const processSubmissionNow = async (submission) => {
   submission.status = SUBMISSION_STATUS.JUDGING;
   await submission.save();
 
-  const problem = await Problem.findById(submission.problem).select("testCases tags timeLimit memoryLimit");
+  const problem = await Problem.findById(submission.problem).select("testCases tags difficulty timeLimit memoryLimit");
 
   if (!problem || !problem.testCases?.length) {
     submission.status = SUBMISSION_STATUS.FAILED;
@@ -90,6 +90,11 @@ const processSubmissionNow = async (submission) => {
     await submission.save();
     return submission;
   }
+
+  // Denormalize problem data onto submission for analytics
+  submission.topicTags = problem.tags || [];
+  submission.difficulty = problem.difficulty;
+  submission.codeLength = (submission.code || "").length;
 
   try {
     const judged = await judgeSubmission({
@@ -115,22 +120,21 @@ const processSubmissionNow = async (submission) => {
     };
     await submission.save();
 
-    // Update analytics
+    // Run the full post-submission analytics pipeline
     try {
-      await updateUserTopicAnalytics({
+      await runPostSubmissionPipeline({
         userId: submission.user,
-        tags: problem.tags,
-        solved: judged.verdict === VERDICTS.ACCEPTED,
+        problemId: submission.problem,
+        tags: problem.tags || [],
+        difficulty: problem.difficulty,
+        verdict: judged.verdict,
+        language: submission.language,
         runtime: judged.runtime,
-      });
-
-      await updateUserTopicStats({
-        userId: submission.user,
-        tags: problem.tags,
-        solved: judged.verdict === VERDICTS.ACCEPTED,
+        memory: judged.memory,
+        timeTaken: submission.timeTaken || 0,
       });
     } catch (analyticsErr) {
-      logger.warn("Failed to update analytics", { error: analyticsErr.message });
+      logger.warn("Failed to update analytics pipeline", { error: analyticsErr.message });
     }
 
     // Track contest submission if applicable
@@ -171,14 +175,14 @@ const processSubmissionNow = async (submission) => {
 };
 
 const createSubmission = asyncHandler(async (req, res) => {
-  const { problemId, language, code, contestId } = req.body;
+  const { problemId, language, code, contestId, timeTaken } = req.body;
 
   // Check for duplicate submission (rapid fire prevention)
   if (isDuplicateSubmission(String(req.user._id), problemId, code)) {
     throw new ApiError(429, "Please wait a few seconds before submitting again");
   }
 
-  const problem = await Problem.findById(problemId).select("_id testCases");
+  const problem = await Problem.findById(problemId).select("_id testCases tags difficulty");
   if (!problem) throw new ApiError(404, "Problem not found");
 
   if (contestId) {
@@ -189,6 +193,12 @@ const createSubmission = asyncHandler(async (req, res) => {
     });
   }
 
+  // Count previous attempts for attemptNumber
+  const previousAttempts = await Submission.countDocuments({
+    user: req.user._id,
+    problem: problem._id,
+  });
+
   const submission = await Submission.create({
     user: req.user._id,
     problem: problem._id,
@@ -196,6 +206,11 @@ const createSubmission = asyncHandler(async (req, res) => {
     language,
     code,
     status: SUBMISSION_STATUS.QUEUED,
+    topicTags: problem.tags || [],
+    difficulty: problem.difficulty,
+    codeLength: (code || "").length,
+    attemptNumber: previousAttempts + 1,
+    timeTaken: timeTaken || undefined,
   });
 
   logger.info("Submission created", {

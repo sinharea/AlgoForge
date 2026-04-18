@@ -37,6 +37,8 @@ const CONTEST_STATUS = {
   ENDED: "ended",
 };
 
+const SUPPORTED_LANGUAGES = ["cpp", "python", "java", "javascript", "go", "rust", "typescript"];
+
 module.exports = {
   USER_ROLES,
   AUTH_PROVIDER,
@@ -44,4 +46,5 @@ module.exports = {
   VERDICTS,
   DIFFICULTY,
   CONTEST_STATUS,
+  SUPPORTED_LANGUAGES,
 };

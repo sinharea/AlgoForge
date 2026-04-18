@@ -66,8 +66,8 @@ const problemSchema = new mongoose.Schema({
       default: "",
     },
   },
-  tags: [{ type: String, index: true }],
-  companyTags: [{ type: String, index: true }],
+  tags: [{ type: String }],
+  companyTags: [{ type: String }],
 
   hints: {
     type: [hintSchema],
@@ -104,25 +104,44 @@ const problemSchema = new mongoose.Schema({
     default: 128
   },
 
-  submissionCount: {
-    type: Number,
-    default: 0,
-  },
-
-  acceptedCount: {
-    type: Number,
-    default: 0,
-  },
-
   similarProblems: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: "Problem",
   }],
+
+  isPublished: {
+    type: Boolean,
+    default: false,
+    index: true,
+  },
+
+  difficultyScore: {
+    type: Number,
+    min: 1,
+    max: 10,
+  },
+
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+  },
+
+  inputFormat: {
+    type: String,
+    default: "",
+  },
+
+  outputFormat: {
+    type: String,
+    default: "",
+  },
 
 }, { timestamps: true });
 
 problemSchema.index({ title: "text", description: "text", tags: "text" });
 problemSchema.index({ questionNumber: 1 }, { unique: true, sparse: true });
 problemSchema.index({ companyTags: 1 });
+problemSchema.index({ tags: 1, difficulty: 1 });
+problemSchema.index({ isPublished: 1, difficulty: 1 });
 
 module.exports = mongoose.model("Problem", problemSchema);

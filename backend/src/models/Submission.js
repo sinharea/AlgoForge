@@ -51,6 +51,28 @@ const submissionSchema = new mongoose.Schema({
   },
   runtime: Number,
   memory: Number,
+
+  // Denormalized from Problem at submission time for analytics
+  topicTags: [{ type: String }],
+  difficulty: {
+    type: String,
+    enum: ["Easy", "Medium", "Hard"],
+  },
+
+  attemptNumber: {
+    type: Number,
+    default: 1,
+  },
+  timeTaken: {
+    type: Number, // seconds from problem open to submission
+  },
+  codeLength: {
+    type: Number,
+  },
+  isFirstAccepted: {
+    type: Boolean,
+    default: false,
+  },
 }, { timestamps: true });
 
 // Composite indexes for common queries
@@ -59,5 +81,7 @@ submissionSchema.index({ user: 1, problem: 1 }); // For "solved" status per user
 submissionSchema.index({ problem: 1, verdict: 1 }); // For problem statistics
 submissionSchema.index({ contest: 1, user: 1 }); // For contest submissions
 submissionSchema.index({ createdAt: -1 }); // For recent submissions list
+submissionSchema.index({ user: 1, topicTags: 1, verdict: 1 }); // For per-topic analytics
+submissionSchema.index({ user: 1, difficulty: 1, verdict: 1 }); // For per-difficulty analytics
 
 module.exports = mongoose.model("Submission", submissionSchema);

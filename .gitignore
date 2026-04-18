@@ -48,3 +48,5 @@ yarn-error.log*
 .dockerignore
 
 image.png
+command.txt
+prompt.txt

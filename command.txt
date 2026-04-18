@@ -11,15 +11,3 @@ task 3: follow rule 2
 
 rule 1: never change anything without asking
 rule 2: always show a modification asking popup as in image.png at end of all tasks
-
-task 1: implement a replacement policy called wbar
-properties -> i have a 16 ways llc cache, 
-if we bring new block to llc, keep nvm dirty at 0, dirty dram at 3, nvm clean at 5, clean dram at 7
-at every hit weight = max(0, weight - 1);
-On eviction -> victim = block with MAX weight
-inc other simulate shifting
-
-
-
-
-always show a modification asking popup as in image.png at end of all tasks

@@ -20,6 +20,16 @@ const sanitizeUser = (user) => ({
   provider: user.provider,
   isEmailVerified: user.isEmailVerified,
   avatarUrl: user.avatarUrl || "",
+  bio: user.bio || "",
+  socialLinks: user.socialLinks || {},
+  preferredLanguage: user.preferredLanguage || "cpp",
+  totalSolved: user.totalSolved || 0,
+  totalSubmissions: user.totalSubmissions || 0,
+  easyCount: user.easyCount || 0,
+  mediumCount: user.mediumCount || 0,
+  hardCount: user.hardCount || 0,
+  currentStreak: user.currentStreak || 0,
+  maxStreak: user.maxStreak || 0,
 });
 
 const issueTokensForUser = async (user) => {
@@ -174,7 +184,7 @@ const getMyProfile = async ({ userId }) => {
   return sanitizeUser(user);
 };
 
-const updateMyProfile = async ({ userId, name, avatarUrl, currentPassword, newPassword }) => {
+const updateMyProfile = async ({ userId, name, avatarUrl, currentPassword, newPassword, bio, socialLinks, preferredLanguage }) => {
   const user = await User.findById(userId).select("+password");
   if (!user) throw new ApiError(404, "User not found");
 
@@ -184,6 +194,23 @@ const updateMyProfile = async ({ userId, name, avatarUrl, currentPassword, newPa
 
   if (typeof avatarUrl === "string") {
     user.avatarUrl = avatarUrl.trim();
+  }
+
+  if (typeof bio === "string") {
+    user.bio = bio.trim().slice(0, 300);
+  }
+
+  if (socialLinks) {
+    const parsed = typeof socialLinks === "string" ? JSON.parse(socialLinks) : socialLinks;
+    user.socialLinks = {
+      github: (parsed.github || "").trim(),
+      linkedin: (parsed.linkedin || "").trim(),
+      website: (parsed.website || "").trim(),
+    };
+  }
+
+  if (typeof preferredLanguage === "string" && ["cpp", "python", "java", "javascript"].includes(preferredLanguage)) {
+    user.preferredLanguage = preferredLanguage;
   }
 
   const wantsPasswordChange =

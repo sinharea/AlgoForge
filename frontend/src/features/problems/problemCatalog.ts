@@ -8,6 +8,9 @@ export type ApiProblem = {
   difficulty: Difficulty;
   tags?: string[];
   hiddenTestCaseCount?: number;
+  submissionCount?: number;
+  acceptedCount?: number;
+  acceptanceRate?: number;
 };
 
 type ProblemSeed = {
@@ -365,13 +368,18 @@ const toProblemRecordFromApi = (problem: ApiProblem): ProblemRecord => {
   const topics = (problem.tags || []).map(normalizeTopic);
   const companies = inferCompanies(topics, identity);
 
+  // Use real acceptance rate from ProblemStats if available
+  const acceptance = problem.acceptanceRate != null && problem.acceptanceRate > 0
+    ? Number(problem.acceptanceRate.toFixed(1))
+    : inferAcceptance(problem.difficulty, identity);
+
   return {
     id: problem._id,
     problemId: problem.questionNumber || stableHash(problem._id) % 5000,
     title: problem.title,
     slug: problem.slug,
     difficulty: problem.difficulty,
-    acceptance: inferAcceptance(problem.difficulty, identity),
+    acceptance,
     topics,
     companies,
     keywords: buildKeywords(problem.title, topics, companies),
@@ -382,7 +390,7 @@ const toProblemRecordFromApi = (problem: ApiProblem): ProblemRecord => {
 
 export const getBaseProblemCatalog = (apiProblems: ApiProblem[]): ProblemRecord[] => {
   if (apiProblems.length === 0) {
-    return sampleProblemData.map(toProblemRecordFromSeed);
+    return [];
   }
 
   return apiProblems

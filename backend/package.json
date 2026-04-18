@@ -8,6 +8,7 @@
     "start": "node src/server.js",
     "worker": "node src/queue/worker.js",
     "seed": "node src/seed/seed.js",
+    "seed:problems": "node src/seed/seed_problems.js",
     "seed:admin": "node seedAdmin.js"
   },
   "keywords": [],

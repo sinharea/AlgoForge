@@ -5,8 +5,11 @@ const User = require("../models/User");
 const Problem = require("../models/Problem");
 const Submission = require("../models/Submission");
 const Contest = require("../models/Contest");
-const UserTopicAnalytics = require("../models/UserTopicAnalytics");
+const UserTopicStats = require("../models/UserTopicStats");
 const ContestSubmission = require("../models/ContestSubmission");
+const ProblemStats = require("../models/ProblemStats");
+const UserProblemStatus = require("../models/UserProblemStatus");
+const DailyActivity = require("../models/DailyActivity");
 const { USER_ROLES } = require("../constants");
 
 const usersData = [
@@ -287,8 +290,11 @@ const run = async () => {
     Problem.deleteMany({ slug: { $in: problemsData.map((p) => p.slug) } }),
     Contest.deleteMany({}),
     Submission.deleteMany({}),
-    UserTopicAnalytics.deleteMany({}),
+    UserTopicStats.deleteMany({}),
     ContestSubmission.deleteMany({}),
+    ProblemStats.deleteMany({}),
+    UserProblemStatus.deleteMany({}),
+    DailyActivity.deleteMany({}),
   ]);
 
   // Create users individually to trigger pre-save hooks for password hashing
@@ -308,6 +314,9 @@ const run = async () => {
       sampleTestCases,
       testCases: hiddenTestCases,
       hiddenTestCaseCount: hiddenTestCases.length,
+      isPublished: true,
+      createdBy: admin._id,
+      difficultyScore: problem.difficulty === "Easy" ? 3 : problem.difficulty === "Medium" ? 5 : 8,
     };
   });
 
@@ -322,6 +331,8 @@ const run = async () => {
     duration: 120,
     problems: problems.slice(0, 5).map((p) => p._id),
     participants: [{ user: alice._id }, { user: bob._id }],
+    createdBy: admin._id,
+    scoringType: "ICPC",
   });
 
   await Contest.create({
@@ -332,6 +343,8 @@ const run = async () => {
     duration: 60,
     problems: problems.slice(0, 3).map((p) => p._id),
     participants: [{ user: admin._id }],
+    createdBy: admin._id,
+    scoringType: "ICPC",
   });
 
   const upcomingContest1 = await Contest.create({
@@ -342,6 +355,8 @@ const run = async () => {
     duration: 120,
     problems: problems.slice(0, 6).map((p) => p._id),
     participants: [{ user: alice._id }],
+    createdBy: admin._id,
+    scoringType: "IOI",
   });
 
   const upcomingContest2 = await Contest.create({
@@ -352,6 +367,8 @@ const run = async () => {
     duration: 180,
     problems: problems.slice(5, 12).map((p) => p._id),
     participants: [],
+    createdBy: admin._id,
+    scoringType: "ICPC",
   });
 
   const upcomingContest3 = await Contest.create({
@@ -362,6 +379,8 @@ const run = async () => {
     duration: 90,
     problems: problems.slice(2, 7).map((p) => p._id),
     participants: [{ user: bob._id }],
+    createdBy: admin._id,
+    scoringType: "ICPC",
   });
 
   const endedContest1 = await Contest.create({
@@ -372,6 +391,8 @@ const run = async () => {
     duration: 120,
     problems: problems.slice(0, 4).map((p) => p._id),
     participants: [{ user: alice._id }, { user: bob._id }, { user: admin._id }],
+    createdBy: admin._id,
+    scoringType: "ICPC",
   });
 
   const endedContest2 = await Contest.create({
@@ -382,166 +403,214 @@ const run = async () => {
     duration: 180,
     problems: problems.slice(4, 10).map((p) => p._id),
     participants: [{ user: alice._id }, { user: bob._id }],
+    createdBy: admin._id,
+    scoringType: "IOI",
   });
 
   const contest = liveContest;
 
-  await Submission.insertMany([
+  // Helper: look up problem by index to get tags & difficulty for denormalization
+  const sub = (userRef, probIdx, lang, codeStr, verdict, runtime, result, contestRef, extra = {}) => {
+    const p = problems[probIdx];
+    return {
+      user: userRef._id,
+      problem: p._id,
+      language: lang,
+      code: codeStr,
+      status: "completed",
+      verdict,
+      runtime,
+      result,
+      topicTags: p.tags,
+      difficulty: p.difficulty,
+      codeLength: codeStr.length,
+      attemptNumber: extra.attemptNumber || 1,
+      isFirstAccepted: extra.isFirstAccepted || false,
+      ...(contestRef ? { contest: contestRef._id } : {}),
+    };
+  };
+
+  const submissionsData = [
     // Live contest submissions
-    {
-      user: alice._id,
-      problem: problems[0]._id,
-      language: "python",
-      code: submissionCode,
-      status: "completed",
-      verdict: "Accepted",
-      runtime: 20,
-      result: { stdout: "0 1", stderr: "", compileOutput: "", passedCount: 1, totalCount: 1 },
-      contest: liveContest._id,
-    },
-    {
-      user: alice._id,
-      problem: problems[1]._id,
-      language: "python",
-      code: submissionCode,
-      status: "completed",
-      verdict: "Accepted",
-      runtime: 15,
-      result: { stdout: "true", stderr: "", compileOutput: "", passedCount: 1, totalCount: 1 },
-      contest: liveContest._id,
-    },
-    {
-      user: alice._id,
-      problem: problems[2]._id,
-      language: "cpp",
-      code: submissionCode,
-      status: "completed",
-      verdict: "Accepted",
-      runtime: 12,
-      result: { stdout: "5 4 3 2 1", stderr: "", compileOutput: "", passedCount: 1, totalCount: 1 },
-      contest: liveContest._id,
-    },
-    {
-      user: bob._id,
-      problem: problems[0]._id,
-      language: "javascript",
-      code: "console.log('0 1')",
-      status: "completed",
-      verdict: "Accepted",
-      runtime: 25,
-      result: { stdout: "0 1", stderr: "", compileOutput: "", passedCount: 1, totalCount: 1 },
-      contest: liveContest._id,
-    },
-    {
-      user: bob._id,
-      problem: problems[1]._id,
-      language: "javascript",
-      code: "console.log('false')",
-      status: "completed",
-      verdict: "Wrong Answer",
-      runtime: 30,
-      result: { stdout: "false", stderr: "", compileOutput: "", passedCount: 0, totalCount: 1 },
-      contest: liveContest._id,
-    },
+    sub(alice, 0, "python", submissionCode, "Accepted", 20, { stdout: "0 1", stderr: "", compileOutput: "", passedCount: 1, totalCount: 1 }, liveContest, { isFirstAccepted: true }),
+    sub(alice, 1, "python", submissionCode, "Accepted", 15, { stdout: "true", stderr: "", compileOutput: "", passedCount: 1, totalCount: 1 }, liveContest, { isFirstAccepted: true }),
+    sub(alice, 2, "cpp", submissionCode, "Accepted", 12, { stdout: "5 4 3 2 1", stderr: "", compileOutput: "", passedCount: 1, totalCount: 1 }, liveContest, { isFirstAccepted: true }),
+    sub(bob, 0, "javascript", "console.log('0 1')", "Accepted", 25, { stdout: "0 1", stderr: "", compileOutput: "", passedCount: 1, totalCount: 1 }, liveContest, { isFirstAccepted: true }),
+    sub(bob, 1, "javascript", "console.log('false')", "Wrong Answer", 30, { stdout: "false", stderr: "", compileOutput: "", passedCount: 0, totalCount: 1 }, liveContest),
     // Ended contest submissions
-    {
-      user: admin._id,
-      problem: problems[0]._id,
-      language: "python",
-      code: submissionCode,
-      status: "completed",
-      verdict: "Accepted",
-      runtime: 18,
-      result: { stdout: "0 1", stderr: "", compileOutput: "", passedCount: 1, totalCount: 1 },
-      contest: endedContest1._id,
-    },
-    {
-      user: admin._id,
-      problem: problems[1]._id,
-      language: "python",
-      code: submissionCode,
-      status: "completed",
-      verdict: "Accepted",
-      runtime: 14,
-      result: { stdout: "true", stderr: "", compileOutput: "", passedCount: 1, totalCount: 1 },
-      contest: endedContest1._id,
-    },
-    {
-      user: admin._id,
-      problem: problems[2]._id,
-      language: "python",
-      code: submissionCode,
-      status: "completed",
-      verdict: "Accepted",
-      runtime: 16,
-      result: { stdout: "5 4 3 2 1", stderr: "", compileOutput: "", passedCount: 1, totalCount: 1 },
-      contest: endedContest1._id,
-    },
-    {
-      user: alice._id,
-      problem: problems[0]._id,
-      language: "cpp",
-      code: submissionCode,
-      status: "completed",
-      verdict: "Accepted",
-      runtime: 10,
-      result: { stdout: "0 1", stderr: "", compileOutput: "", passedCount: 1, totalCount: 1 },
-      contest: endedContest1._id,
-    },
-    {
-      user: alice._id,
-      problem: problems[1]._id,
-      language: "cpp",
-      code: submissionCode,
-      status: "completed",
-      verdict: "Accepted",
-      runtime: 11,
-      result: { stdout: "true", stderr: "", compileOutput: "", passedCount: 1, totalCount: 1 },
-      contest: endedContest1._id,
-    },
-    {
-      user: bob._id,
-      problem: problems[0]._id,
-      language: "python",
-      code: submissionCode,
-      status: "completed",
-      verdict: "Accepted",
-      runtime: 22,
-      result: { stdout: "0 1", stderr: "", compileOutput: "", passedCount: 1, totalCount: 1 },
-      contest: endedContest1._id,
-    },
+    sub(admin, 0, "python", submissionCode, "Accepted", 18, { stdout: "0 1", stderr: "", compileOutput: "", passedCount: 1, totalCount: 1 }, endedContest1, { isFirstAccepted: true }),
+    sub(admin, 1, "python", submissionCode, "Accepted", 14, { stdout: "true", stderr: "", compileOutput: "", passedCount: 1, totalCount: 1 }, endedContest1, { isFirstAccepted: true }),
+    sub(admin, 2, "python", submissionCode, "Accepted", 16, { stdout: "5 4 3 2 1", stderr: "", compileOutput: "", passedCount: 1, totalCount: 1 }, endedContest1, { isFirstAccepted: true }),
+    sub(alice, 0, "cpp", submissionCode, "Accepted", 10, { stdout: "0 1", stderr: "", compileOutput: "", passedCount: 1, totalCount: 1 }, endedContest1, { attemptNumber: 2 }),
+    sub(alice, 1, "cpp", submissionCode, "Accepted", 11, { stdout: "true", stderr: "", compileOutput: "", passedCount: 1, totalCount: 1 }, endedContest1, { attemptNumber: 2 }),
+    sub(bob, 0, "python", submissionCode, "Accepted", 22, { stdout: "0 1", stderr: "", compileOutput: "", passedCount: 1, totalCount: 1 }, endedContest1, { attemptNumber: 2 }),
     // Practice submissions (no contest)
-    {
-      user: admin._id,
-      problem: problems[5]._id,
-      language: "python",
-      code: submissionCode,
-      status: "completed",
-      verdict: "Accepted",
-      runtime: 25,
-      result: { stdout: "3", stderr: "", compileOutput: "", passedCount: 3, totalCount: 3 },
-    },
-    {
-      user: alice._id,
-      problem: problems[5]._id,
-      language: "javascript",
-      code: submissionCode,
-      status: "completed",
-      verdict: "Time Limit Exceeded",
-      runtime: 5000,
-      result: { stdout: "", stderr: "TLE", compileOutput: "", passedCount: 1, totalCount: 3 },
-    },
-    {
-      user: bob._id,
-      problem: problems[6]._id,
-      language: "python",
-      code: submissionCode,
-      status: "completed",
-      verdict: "Runtime Error",
-      runtime: 0,
-      result: { stdout: "", stderr: "TypeError: 'NoneType' object is not subscriptable", compileOutput: "", passedCount: 0, totalCount: 3 },
-    },
-  ]);
+    sub(admin, 5, "python", submissionCode, "Accepted", 25, { stdout: "3", stderr: "", compileOutput: "", passedCount: 3, totalCount: 3 }, null, { isFirstAccepted: true }),
+    sub(alice, 5, "javascript", submissionCode, "Time Limit Exceeded", 5000, { stdout: "", stderr: "TLE", compileOutput: "", passedCount: 1, totalCount: 3 }, null),
+    sub(bob, 6, "python", submissionCode, "Runtime Error", 0, { stdout: "", stderr: "TypeError: 'NoneType' object is not subscriptable", compileOutput: "", passedCount: 0, totalCount: 3 }, null),
+  ];
+
+  const insertedSubmissions = await Submission.insertMany(submissionsData);
+
+  // --- Populate derived collections ---
+
+  // Build a problemId → problem map
+  const problemMap = {};
+  for (const p of problems) {
+    problemMap[p._id.toString()] = p;
+  }
+
+  // 1. ProblemStats: aggregate submission counts per problem
+  const problemStatsMap = {};
+  for (const s of submissionsData) {
+    const pid = s.problem.toString();
+    if (!problemStatsMap[pid]) {
+      problemStatsMap[pid] = { problemId: s.problem, totalSubmissions: 0, acceptedSubmissions: 0, languageBreakdown: {} };
+    }
+    problemStatsMap[pid].totalSubmissions += 1;
+    if (s.verdict === "Accepted") problemStatsMap[pid].acceptedSubmissions += 1;
+    problemStatsMap[pid].languageBreakdown[s.language] = (problemStatsMap[pid].languageBreakdown[s.language] || 0) + 1;
+  }
+  await ProblemStats.insertMany(Object.values(problemStatsMap));
+
+  // 2. UserProblemStatus: per user x problem
+  const upStatusMap = {};
+  for (const s of submissionsData) {
+    const key = `${s.user.toString()}_${s.problem.toString()}`;
+    if (!upStatusMap[key]) {
+      upStatusMap[key] = {
+        userId: s.user,
+        problemId: s.problem,
+        status: "attempted",
+        attempts: 0,
+        bestRuntime: null,
+      };
+    }
+    upStatusMap[key].attempts += 1;
+    if (s.verdict === "Accepted") {
+      upStatusMap[key].status = "solved";
+      if (upStatusMap[key].bestRuntime === null || s.runtime < upStatusMap[key].bestRuntime) {
+        upStatusMap[key].bestRuntime = s.runtime;
+      }
+    }
+  }
+  await UserProblemStatus.insertMany(Object.values(upStatusMap));
+
+  // 3. UserTopicStats: per user x topic
+  const utStatsMap = {};
+  for (const s of submissionsData) {
+    for (const tag of (s.topicTags || [])) {
+      const key = `${s.user.toString()}_${tag}`;
+      if (!utStatsMap[key]) {
+        utStatsMap[key] = {
+          userId: s.user,
+          topic: tag,
+          totalAttempts: 0,
+          totalSolved: 0,
+          easy: { attempts: 0, solved: 0 },
+          medium: { attempts: 0, solved: 0 },
+          hard: { attempts: 0, solved: 0 },
+        };
+      }
+      const entry = utStatsMap[key];
+      entry.totalAttempts += 1;
+      const diff = (s.difficulty || "").toLowerCase();
+      if (entry[diff]) entry[diff].attempts += 1;
+      if (s.verdict === "Accepted") {
+        entry.totalSolved += 1;
+        if (entry[diff]) entry[diff].solved += 1;
+      }
+    }
+  }
+  // Compute accuracy
+  for (const entry of Object.values(utStatsMap)) {
+    entry.accuracy = entry.totalAttempts > 0 ? Math.round((entry.totalSolved / entry.totalAttempts) * 100) : 0;
+  }
+  await UserTopicStats.insertMany(Object.values(utStatsMap));
+
+  // 4. DailyActivity: put all submissions on today's date
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dailyMap = {};
+  for (const s of submissionsData) {
+    const uid = s.user.toString();
+    if (!dailyMap[uid]) {
+      dailyMap[uid] = {
+        userId: s.user,
+        date: today,
+        submissionCount: 0,
+        acceptedCount: 0,
+        problemsAttempted: new Set(),
+        problemsSolved: new Set(),
+        topicsPracticed: new Set(),
+      };
+    }
+    const d = dailyMap[uid];
+    d.submissionCount += 1;
+    d.problemsAttempted.add(s.problem.toString());
+    if (s.verdict === "Accepted") {
+      d.acceptedCount += 1;
+      d.problemsSolved.add(s.problem.toString());
+    }
+    for (const tag of (s.topicTags || [])) d.topicsPracticed.add(tag);
+  }
+  await DailyActivity.insertMany(
+    Object.values(dailyMap).map((d) => ({
+      userId: d.userId,
+      date: d.date,
+      submissionCount: d.submissionCount,
+      acceptedCount: d.acceptedCount,
+      problemsAttempted: d.problemsAttempted.size,
+      problemsSolved: d.problemsSolved.size,
+      topicsPracticed: [...d.topicsPracticed],
+    }))
+  );
+
+  // 5. Update User denormalized counters
+  for (const u of users) {
+    const userSubs = submissionsData.filter((s) => s.user.toString() === u._id.toString());
+    const accepted = userSubs.filter((s) => s.verdict === "Accepted");
+    const solvedProblemIds = [...new Set(accepted.map((s) => s.problem.toString()))];
+    const solvedProblems = solvedProblemIds.map((pid) => problemMap[pid]).filter(Boolean);
+
+    await User.findByIdAndUpdate(u._id, {
+      totalSubmissions: userSubs.length,
+      totalSolved: solvedProblemIds.length,
+      easyCount: solvedProblems.filter((p) => p.difficulty === "Easy").length,
+      mediumCount: solvedProblems.filter((p) => p.difficulty === "Medium").length,
+      hardCount: solvedProblems.filter((p) => p.difficulty === "Hard").length,
+      currentStreak: 1,
+      maxStreak: 1,
+      lastActiveDate: today,
+    });
+  }
+
+  // 6. ContestSubmission records for contest submissions
+  const contestSubDocs = [];
+  for (const s of insertedSubmissions) {
+    if (!s.contest) continue;
+    contestSubDocs.push({
+      contest: s.contest,
+      user: s.user,
+      problem: s.problem,
+      submission: s._id,
+      verdict: s.verdict,
+      solved: s.verdict === "Accepted",
+      penaltyMinutes: s.verdict === "Accepted" ? Math.floor(s.runtime / 60) : 0,
+      points: s.verdict === "Accepted" ? 100 : 0,
+    });
+  }
+  if (contestSubDocs.length > 0) {
+    await ContestSubmission.insertMany(contestSubDocs);
+  }
+
+  console.log(`  → ${problems.length} problems (isPublished: true)`);
+  console.log(`  → ${insertedSubmissions.length} submissions (with topicTags/difficulty)`);
+  console.log(`  → ${Object.keys(problemStatsMap).length} ProblemStats docs`);
+  console.log(`  → ${Object.keys(upStatusMap).length} UserProblemStatus docs`);
+  console.log(`  → ${Object.keys(utStatsMap).length} UserTopicStats docs`);
+  console.log(`  → ${Object.keys(dailyMap).length} DailyActivity docs`);
+  console.log(`  → ${contestSubDocs.length} ContestSubmission docs`);
 
   await mongoose.disconnect();
 };

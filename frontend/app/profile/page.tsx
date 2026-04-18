@@ -14,6 +14,9 @@ type ProfileUser = {
   email: string;
   role: string;
   avatarUrl?: string;
+  bio?: string;
+  socialLinks?: { github?: string; linkedin?: string; website?: string };
+  preferredLanguage?: string;
 };
 
 export default function ProfilePage() {
@@ -26,6 +29,11 @@ export default function ProfilePage() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [bio, setBio] = useState("");
+  const [github, setGithub] = useState("");
+  const [linkedin, setLinkedin] = useState("");
+  const [website, setWebsite] = useState("");
+  const [preferredLanguage, setPreferredLanguage] = useState("cpp");
 
   const profileQuery = useQuery({
     queryKey: ["profile"],
@@ -37,6 +45,11 @@ export default function ProfilePage() {
     if (!profile) return;
     setName(profile.name || "");
     setAvatarUrl(profile.avatarUrl || "");
+    setBio((profile as ProfileUser).bio || "");
+    setGithub((profile as ProfileUser).socialLinks?.github || "");
+    setLinkedin((profile as ProfileUser).socialLinks?.linkedin || "");
+    setWebsite((profile as ProfileUser).socialLinks?.website || "");
+    setPreferredLanguage((profile as ProfileUser).preferredLanguage || "cpp");
   }, [profileQuery.data, user]);
 
   useEffect(() => {
@@ -55,6 +68,9 @@ export default function ProfilePage() {
     mutationFn: async () => {
       const payload = new FormData();
       payload.append("name", name.trim());
+      payload.append("bio", bio.trim());
+      payload.append("preferredLanguage", preferredLanguage);
+      payload.append("socialLinks", JSON.stringify({ github: github.trim(), linkedin: linkedin.trim(), website: website.trim() }));
       if (avatarFile) {
         payload.append("avatar", avatarFile);
       }
@@ -171,6 +187,62 @@ export default function ProfilePage() {
               }}
             />
           </label>
+        </div>
+
+        <div>
+          <label className="mb-2 block text-sm font-medium">Bio</label>
+          <textarea
+            value={bio}
+            onChange={(e) => setBio(e.target.value)}
+            className="input min-h-[80px] resize-y"
+            maxLength={300}
+            placeholder="A short bio about yourself"
+          />
+          <p className="mt-1 text-xs text-[var(--text-muted)]">{bio.length}/300</p>
+        </div>
+
+        <div>
+          <label className="mb-2 block text-sm font-medium">Preferred Language</label>
+          <select
+            value={preferredLanguage}
+            onChange={(e) => setPreferredLanguage(e.target.value)}
+            className="input"
+          >
+            <option value="cpp">C++</option>
+            <option value="python">Python</option>
+            <option value="java">Java</option>
+            <option value="javascript">JavaScript</option>
+          </select>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div>
+            <label className="mb-2 block text-sm font-medium">GitHub</label>
+            <input
+              value={github}
+              onChange={(e) => setGithub(e.target.value)}
+              className="input"
+              placeholder="https://github.com/username"
+            />
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-medium">LinkedIn</label>
+            <input
+              value={linkedin}
+              onChange={(e) => setLinkedin(e.target.value)}
+              className="input"
+              placeholder="https://linkedin.com/in/username"
+            />
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-medium">Website</label>
+            <input
+              value={website}
+              onChange={(e) => setWebsite(e.target.value)}
+              className="input"
+              placeholder="https://yoursite.com"
+            />
+          </div>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">

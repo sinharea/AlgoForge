@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 const Problem = require("../models/Problem");
-const UserTopicAnalytics = require("../models/UserTopicAnalytics");
-const TopicStat = require("../models/TopicStat");
+const UserTopicStats = require("../models/UserTopicStats");
+const UserProblemStatus = require("../models/UserProblemStatus");
 const Submission = require("../models/Submission");
 const redis = require("../config/redis");
 
@@ -9,8 +9,8 @@ const formatTopicRows = (rows = []) =>
   rows.map((row) => ({
     topic: row.topic,
     accuracy: Number(row.accuracy || 0),
-    attempts: row.attempts,
-    correct: row.correct,
+    attempts: row.totalAttempts,
+    correct: row.totalSolved,
   }));
 
 const buildImprovementStrategy = ({ weakTopics, strongTopics, recommendationCount }) => {
@@ -35,40 +35,27 @@ const buildImprovementStrategy = ({ weakTopics, strongTopics, recommendationCoun
 };
 
 const getUserDashboardStats = async (userId) => {
-  const solvedProblems = await Submission.aggregate([
-    {
-      $match: {
-        user: new mongoose.Types.ObjectId(userId),
-        verdict: "Accepted",
-      },
-    },
-    {
-      $group: {
-        _id: "$problem",
-        latest: { $max: "$createdAt" },
-      },
-    },
-    {
-      $lookup: {
-        from: "problems",
-        localField: "_id",
-        foreignField: "_id",
-        as: "problem",
-      },
-    },
-    { $unwind: "$problem" },
-  ]);
+  // Use UserProblemStatus for efficient solved query instead of aggregating Submissions
+  const solvedStatuses = await UserProblemStatus.find({ userId, status: "solved" })
+    .select("problemId")
+    .lean();
+
+  const solvedProblemIds = solvedStatuses.map((s) => s.problemId);
+
+  const solvedProblems = await Problem.find({ _id: { $in: solvedProblemIds } })
+    .select("difficulty tags")
+    .lean();
 
   const difficultyStats = solvedProblems.reduce(
     (acc, row) => {
-      acc[row.problem.difficulty] = (acc[row.problem.difficulty] || 0) + 1;
+      acc[row.difficulty] = (acc[row.difficulty] || 0) + 1;
       return acc;
     },
     { Easy: 0, Medium: 0, Hard: 0 }
   );
 
   const topicStats = solvedProblems.reduce((acc, row) => {
-    (row.problem.tags || []).forEach((tag) => {
+    (row.tags || []).forEach((tag) => {
       acc[tag] = (acc[tag] || 0) + 1;
     });
     return acc;
@@ -86,19 +73,20 @@ const getRecommendations = async (userId) => {
   const cached = await redis.get(cacheKey);
   if (cached) return JSON.parse(cached);
 
-  const analytics = await UserTopicAnalytics.findOne({ user: userId });
-  const weakTopics = (analytics?.topics || [])
-    .filter((t) => t.attempts >= 2)
+  const analytics = await UserTopicStats.find({ userId }).sort({ accuracy: 1 }).lean();
+  const weakTopics = (analytics || [])
+    .filter((t) => t.totalAttempts >= 2)
     .sort((a, b) => a.accuracy - b.accuracy)
     .slice(0, 3)
     .map((t) => t.topic);
 
-  const solvedProblemIds = await Submission.distinct("problem", {
-    user: userId,
-    verdict: "Accepted",
-  });
+  // Use UserProblemStatus to filter solved problems efficiently
+  const solvedProblemIds = (await UserProblemStatus.find({ userId, status: "solved" })
+    .select("problemId")
+    .lean()
+  ).map((s) => s.problemId);
 
-  const totalSolved = analytics?.totalSolved || 0;
+  const totalSolved = solvedProblemIds.length;
   const targetDifficulty = totalSolved < 10 ? "Easy" : totalSolved < 40 ? "Medium" : "Hard";
 
   const query = {
@@ -130,7 +118,7 @@ const getRecommendations = async (userId) => {
 };
 
 const getWeaknessReport = async (userId) => {
-  const stats = await TopicStat.find({ userId }).sort({ accuracy: 1, attempts: -1 }).lean();
+  const stats = await UserTopicStats.find({ userId }).sort({ accuracy: 1, totalAttempts: -1 }).lean();
   const normalizedStats = formatTopicRows(stats).filter((row) => row.attempts > 0);
 
   if (!normalizedStats.length) {
@@ -153,16 +141,16 @@ const getWeaknessReport = async (userId) => {
     : weakTopics;
 
   const strongTopics = normalizedStats
-    .filter((row) => row.attempts >= 2 && row.accuracy >= 0.7)
+    .filter((row) => row.attempts >= 2 && row.accuracy >= 70)
     .sort((a, b) => b.accuracy - a.accuracy || b.attempts - a.attempts)
     .slice(0, 5);
 
   const weakTopicNames = fallbackWeak.map((row) => row.topic);
 
-  const solvedProblemIds = await Submission.distinct("problem", {
-    user: userId,
-    verdict: "Accepted",
-  });
+  const solvedProblemIds = (await UserProblemStatus.find({ userId, status: "solved" })
+    .select("problemId")
+    .lean()
+  ).map((s) => s.problemId);
 
   let recommendedProblems = [];
 

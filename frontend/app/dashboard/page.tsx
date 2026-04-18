@@ -33,13 +33,15 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import useProtectedRoute from "@/src/hooks/useProtectedRoute";
 import { authApi } from "@/src/api/authApi";
+import { userApi } from "@/src/api/userApi";
 import { problemApi } from "@/src/api/problemApi";
 import { useAuthContext } from "@/src/context/AuthContext";
 import ChartCard from "@/src/components/dashboard/ChartCard";
 import ProblemCard from "@/src/components/dashboard/ProblemCard";
 import StatCard from "@/src/components/dashboard/StatCard";
 import DashboardSkeleton from "@/src/components/dashboard/DashboardSkeleton";
-import { dashboardMock, DashboardMockData, RecommendedProblem } from "@/src/data/dashboardMock";
+import ActivityHeatmap from "@/src/components/dashboard/ActivityHeatmap";
+import { DashboardMockData, RecommendedProblem } from "@/src/data/dashboardMock";
 
 const chartColors = {
   Easy: "#22c55e",
@@ -95,6 +97,18 @@ export default function DashboardPage() {
     retry: 1,
   });
 
+  const heatmapQuery = useQuery({
+    queryKey: ["heatmap", new Date().getFullYear()],
+    queryFn: async () => (await userApi.heatmap(new Date().getFullYear())).data,
+    retry: 1,
+  });
+
+  const profileQuery = useQuery({
+    queryKey: ["me-profile"],
+    queryFn: async () => (await authApi.me()).data,
+    retry: 1,
+  });
+
   const loading =
     dashboardQuery.isLoading || recommendationsQuery.isLoading || recentQuery.isLoading;
 
@@ -102,6 +116,7 @@ export default function DashboardPage() {
     const stats = dashboardQuery.data || {};
     const rec = recommendationsQuery.data || {};
     const allSubmissions = recentQuery.data?.items || [];
+    const profile = profileQuery.data || {};
 
     const recommended: RecommendedProblem[] =
       (rec?.suggestions || []).map((item: any) => ({
@@ -112,12 +127,13 @@ export default function DashboardPage() {
         tags: item.tags || [],
       })) || [];
 
-    const solved = Number(stats?.totalSolved ?? dashboardMock.totalSolved);
-    const easy = Number(stats?.byDifficulty?.Easy ?? dashboardMock.byDifficulty.Easy);
-    const medium = Number(stats?.byDifficulty?.Medium ?? dashboardMock.byDifficulty.Medium);
-    const hard = Number(stats?.byDifficulty?.Hard ?? dashboardMock.byDifficulty.Hard);
+    const solved = Number(stats?.totalSolved ?? profile?.totalSolved ?? 0);
+    const easy = Number(stats?.byDifficulty?.Easy ?? profile?.easyCount ?? 0);
+    const medium = Number(stats?.byDifficulty?.Medium ?? profile?.mediumCount ?? 0);
+    const hard = Number(stats?.byDifficulty?.Hard ?? profile?.hardCount ?? 0);
 
-    const streakDays = computeStreak(allSubmissions) || dashboardMock.streakDays;
+    // Use server-side streak if available, fallback to computed
+    const streakDays = Number(profile?.currentStreak) || computeStreak(allSubmissions) || 0;
 
     const achievements = [
       {
@@ -147,9 +163,9 @@ export default function DashboardPage() {
     ];
 
     return {
-      userName: user?.name || dashboardMock.userName,
+      userName: user?.name || "Coder",
       totalSolved: solved,
-      totalProblems: dashboardMock.totalProblems,
+      totalProblems: 500,
       streakDays,
       byDifficulty: {
         Easy: easy,
@@ -159,8 +175,8 @@ export default function DashboardPage() {
       byTopic:
         stats?.byTopic && Object.keys(stats.byTopic).length > 0
           ? stats.byTopic
-          : dashboardMock.byTopic,
-      recommendations: recommended.length > 0 ? recommended : dashboardMock.recommendations,
+          : {},
+      recommendations: recommended.length > 0 ? recommended : [],
       recentActivity:
         allSubmissions.length > 0
           ? allSubmissions.slice(0, 5).map((item: any) => ({
@@ -168,10 +184,10 @@ export default function DashboardPage() {
               title: item.problem?.title || "Solved Problem",
               solvedAt: item.createdAt,
             }))
-          : dashboardMock.recentActivity,
+          : [],
       achievements,
     };
-  }, [dashboardQuery.data, recommendationsQuery.data, recentQuery.data, user?.name]);
+  }, [dashboardQuery.data, recommendationsQuery.data, recentQuery.data, profileQuery.data, user?.name]);
 
   const progressPercent = Math.min(
     100,
@@ -396,6 +412,18 @@ export default function DashboardPage() {
             <span>75%</span>
             <span>Goal</span>
           </div>
+        </section>
+
+        {/* Activity Heatmap */}
+        <section className="mt-6 rounded-2xl border border-white/10 bg-[#111525]/90 p-5">
+          <div className="mb-4">
+            <h3 className="text-base font-semibold text-white">Activity</h3>
+            <p className={`text-sm ${cardTextMuted}`}>Your submission activity over the year</p>
+          </div>
+          <ActivityHeatmap
+            data={heatmapQuery.data || []}
+            year={new Date().getFullYear()}
+          />
         </section>
 
         <section className="mt-6 grid gap-6 xl:grid-cols-[1.4fr_1fr]">

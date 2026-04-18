@@ -1,4 +1,5 @@
 const Problem = require("../models/Problem");
+const ProblemStats = require("../models/ProblemStats");
 const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/apiError");
 const { createProblem, updateProblem } = require("../services/problemService");
@@ -13,15 +14,36 @@ const getAllProblems = asyncHandler(async (req, res) => {
 
   const [items, total] = await Promise.all([
     Problem.find(filter)
-      .select("questionNumber title slug difficulty tags companyTags hiddenTestCaseCount submissionCount acceptedCount")
+      .select("questionNumber title slug difficulty tags companyTags hiddenTestCaseCount")
       .skip((page - 1) * limit)
       .limit(limit)
       .sort({ questionNumber: 1, createdAt: -1 }),
     Problem.countDocuments(filter),
   ]);
 
+  // Attach stats from ProblemStats collection
+  const problemIds = items.map((p) => p._id);
+  const statsMap = {};
+  if (problemIds.length) {
+    const stats = await ProblemStats.find({ problemId: { $in: problemIds } })
+      .select("problemId totalSubmissions acceptedSubmissions acceptanceRate")
+      .lean();
+    for (const s of stats) {
+      statsMap[String(s.problemId)] = s;
+    }
+  }
+
+  const enrichedItems = items.map((p) => {
+    const pObj = p.toObject();
+    const stats = statsMap[String(p._id)] || {};
+    pObj.submissionCount = stats.totalSubmissions || 0;
+    pObj.acceptedCount = stats.acceptedSubmissions || 0;
+    pObj.acceptanceRate = stats.acceptanceRate || 0;
+    return pObj;
+  });
+
   res.json({
-    items,
+    items: enrichedItems,
     page,
     limit,
     total,

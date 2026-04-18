@@ -7,6 +7,7 @@ import { AlertTriangle, Database, Layers, Shell, Sparkles, SplitSquareHorizontal
 import ErrorState from "@/src/components/ui/ErrorState";
 import { ProblemListSkeleton } from "@/src/components/ui/Skeleton";
 import { problemApi } from "@/src/api/problemApi";
+import { userApi } from "@/src/api/userApi";
 import CompanySidebar from "./CompanySidebar";
 import FilterBar from "./FilterBar";
 import ProblemTable from "./ProblemTable";
@@ -15,7 +16,6 @@ import {
   ApiProblem,
   CATEGORY_TABS,
   DEFAULT_TOPIC_TAGS,
-  TRENDING_COMPANIES,
   getBaseProblemCatalog,
   getDifficultyRank,
 } from "./problemCatalog";
@@ -197,6 +197,19 @@ export default function ProblemsPage() {
     retry: false,
   });
 
+  // Fetch server-side problem statuses (favorites, bookmarks, solved)
+  const statusesQuery = useQuery({
+    queryKey: ["problem-statuses"],
+    queryFn: async () => (await userApi.problemStatuses()).data as Array<{
+      problemId: string;
+      status: string;
+      isFavorited: boolean;
+      isBookmarked: boolean;
+    }>,
+    staleTime: 1000 * 60 * 2,
+    retry: false,
+  });
+
   useEffect(() => {
     window.localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favoriteIds));
   }, [favoriteIds]);
@@ -213,10 +226,23 @@ export default function ProblemsPage() {
   );
 
   const serverSolvedSet = useMemo(() => new Set(solvedQuery.data || []), [solvedQuery.data]);
-  const favoriteSet = useMemo(() => new Set(favoriteIds), [favoriteIds]);
+
+  // Merge server-side favorites with localStorage fallback
+  const favoriteSet = useMemo(() => {
+    const set = new Set(favoriteIds);
+    (statusesQuery.data || []).forEach((s) => {
+      if (s.isFavorited) set.add(s.problemId);
+    });
+    return set;
+  }, [favoriteIds, statusesQuery.data]);
 
   const solvedSet = useMemo(() => {
     const merged = new Set(serverSolvedSet);
+
+    // Merge server-side solved statuses
+    (statusesQuery.data || []).forEach((s) => {
+      if (s.status === "solved") merged.add(s.problemId);
+    });
 
     Object.entries(solvedOverrides).forEach(([problemId, status]) => {
       if (status) {
@@ -227,7 +253,7 @@ export default function ProblemsPage() {
     });
 
     return merged;
-  }, [serverSolvedSet, solvedOverrides]);
+  }, [serverSolvedSet, solvedOverrides, statusesQuery.data]);
 
   const allProblems = useMemo<ProblemViewItem[]>(
     () =>
@@ -260,7 +286,7 @@ export default function ProblemsPage() {
   }, [allProblems]);
 
   const companyOptions = useMemo(() => {
-    const companies = new Set<string>(TRENDING_COMPANIES.map((company) => company.name));
+    const companies = new Set<string>();
     allProblems.forEach((problem) => {
       problem.companies.forEach((company) => companies.add(company));
     });
@@ -275,10 +301,13 @@ export default function ProblemsPage() {
       });
     });
 
-    return TRENDING_COMPANIES.map((company) => ({
-      name: company.name,
-      mentions: Math.max(company.mentions, frequencyMap.get(company.name) || 0),
-    }));
+    return Array.from(frequencyMap.entries())
+      .map(([name, mentions]) => ({ name, mentions }))
+      .sort((left, right) => {
+        if (right.mentions !== left.mentions) return right.mentions - left.mentions;
+        return left.name.localeCompare(right.name);
+      })
+      .slice(0, 5);
   }, [allProblems]);
 
   const filteredProblems = useMemo(() => {
@@ -420,6 +449,8 @@ export default function ProblemsPage() {
 
   const handleToggleFavorite = useCallback((problemId: string) => {
     setFavoriteIds((previous) => toggleInArray(previous, problemId));
+    // Persist to server
+    userApi.toggleFavorite(problemId).catch(() => {});
   }, []);
 
   const handleToggleSolved = useCallback(
@@ -514,7 +545,7 @@ export default function ProblemsPage() {
           <div className="mt-4 rounded-xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm text-amber-100">
             <div className="flex items-start gap-2">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>Live problem API is unavailable. Showing sample catalog data so you can continue browsing.</span>
+              <span>Live problem API is unavailable. Problem list and company trends may be incomplete.</span>
             </div>
           </div>
         )}

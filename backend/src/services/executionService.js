@@ -14,10 +14,17 @@ const {
   dockerExecutionTimeoutMs,
   localExecutionTimeoutMs,
   nodeEnv,
+  dockerImagePython,
+  dockerImageNode,
+  dockerImageCpp,
+  dockerImageJava,
+  dockerImageGo,
+  dockerImageRust,
+  maxOutputSize,
 } = require("../config/env");
 
-// Maximum output size (64KB) to prevent memory exhaustion
-const MAX_OUTPUT_SIZE = 65536;
+// Maximum output size to prevent memory exhaustion
+const MAX_OUTPUT_SIZE = maxOutputSize;
 
 // Truncate output to prevent memory issues
 const truncateOutput = (str, maxLen = MAX_OUTPUT_SIZE) => {
@@ -27,13 +34,13 @@ const truncateOutput = (str, maxLen = MAX_OUTPUT_SIZE) => {
 };
 
 const dockerSpec = {
-  python: { image: "python:3.12-alpine", file: "main.py", args: ["python3", "main.py"] },
-  javascript: { image: "node:20-alpine", file: "main.js", args: ["node", "main.js"] },
-  cpp: { image: "gcc:13", file: "main.cpp", args: ["sh", "-c", "g++ main.cpp -O2 -o main 2>&1 && ./main"] },
-  java: { image: "openjdk:17-alpine", file: "Main.java", args: ["sh", "-c", "javac Main.java 2>&1 && java Main"] },
-  go: { image: "golang:1.21-alpine", file: "main.go", args: ["go", "run", "main.go"] },
-  rust: { image: "rust:1.74-alpine", file: "main.rs", args: ["sh", "-c", "rustc main.rs -o main 2>&1 && ./main"] },
-  typescript: { image: "node:20-alpine", file: "main.ts", args: ["sh", "-c", "npx -y ts-node main.ts"] },
+  python: { image: dockerImagePython, file: "main.py", args: ["python3", "main.py"] },
+  javascript: { image: dockerImageNode, file: "main.js", args: ["node", "main.js"] },
+  cpp: { image: dockerImageCpp, file: "main.cpp", args: ["sh", "-c", "g++ main.cpp -O2 -o main 2>&1 && ./main"] },
+  java: { image: dockerImageJava, file: "Main.java", args: ["sh", "-c", "javac Main.java 2>&1 && java Main"] },
+  go: { image: dockerImageGo, file: "main.go", args: ["go", "run", "main.go"] },
+  rust: { image: dockerImageRust, file: "main.rs", args: ["sh", "-c", "rustc main.rs -o main 2>&1 && ./main"] },
+  typescript: { image: dockerImageNode, file: "main.ts", args: ["sh", "-c", "npx -y ts-node main.ts"] },
 };
 
 const localSpec = {

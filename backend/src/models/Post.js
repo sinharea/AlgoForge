@@ -68,6 +68,10 @@ const postSchema = new mongoose.Schema(
       ref: "Comment",
       default: null,
     },
+    language: {
+      type: String,
+      trim: true,
+    },
   },
   { timestamps: true }
 );

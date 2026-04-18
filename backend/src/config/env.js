@@ -63,4 +63,12 @@ module.exports = {
   dockerExecutionTimeoutMs: Number(process.env.DOCKER_EXECUTION_TIMEOUT_MS || 5000),
   localExecutionTimeoutMs: Number(process.env.LOCAL_EXECUTION_TIMEOUT_MS || 4000),
   redisUrl: process.env.REDIS_URL || "redis://127.0.0.1:6379",
+  dockerImagePython: process.env.DOCKER_IMAGE_PYTHON || "python:3.12-alpine",
+  dockerImageNode: process.env.DOCKER_IMAGE_NODE || "node:20-alpine",
+  dockerImageCpp: process.env.DOCKER_IMAGE_CPP || "gcc:13",
+  dockerImageJava: process.env.DOCKER_IMAGE_JAVA || "openjdk:17-alpine",
+  dockerImageGo: process.env.DOCKER_IMAGE_GO || "golang:1.21-alpine",
+  dockerImageRust: process.env.DOCKER_IMAGE_RUST || "rust:1.74-alpine",
+  bcryptSaltRounds: toPositiveInt(process.env.BCRYPT_SALT_ROUNDS, 12),
+  maxOutputSize: toPositiveInt(process.env.MAX_OUTPUT_SIZE, 65536),
 };

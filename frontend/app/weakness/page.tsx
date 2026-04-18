@@ -1,11 +1,28 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertCircle, BrainCircuit, Loader2, Sparkles, Target } from "lucide-react";
+import { AlertCircle, BarChart3, BrainCircuit, Loader2, Sparkles, Target } from "lucide-react";
 import useProtectedRoute from "@/src/hooks/useProtectedRoute";
 import { authApi } from "@/src/api/authApi";
+import { userApi } from "@/src/api/userApi";
 import WeakTopicCard from "@/src/components/weakness/WeakTopicCard";
 import RecommendedProblemCard from "@/src/components/weakness/RecommendedProblemCard";
+
+type TopicStat = {
+  topic: string;
+  totalAttempts: number;
+  totalSolved: number;
+  accuracy: number;
+  easyAttempts: number;
+  easySolved: number;
+  mediumAttempts: number;
+  mediumSolved: number;
+  hardAttempts: number;
+  hardSolved: number;
+  recentAccuracy: number;
+  streakInTopic: number;
+};
 
 type TopicRow = {
   topic: string;
@@ -30,6 +47,7 @@ type WeaknessResponse = {
 
 export default function WeaknessPage() {
   const { ready } = useProtectedRoute();
+  const [granularity, setGranularity] = useState<"all" | "easy" | "medium" | "hard">("all");
 
   const weaknessQuery = useQuery<WeaknessResponse>({
     queryKey: ["weakness-report"],
@@ -37,6 +55,36 @@ export default function WeaknessPage() {
     enabled: ready,
     retry: 1,
   });
+
+  const topicStatsQuery = useQuery<TopicStat[]>({
+    queryKey: ["topic-stats"],
+    queryFn: async () => (await userApi.topicStats()).data,
+    enabled: ready,
+    retry: 1,
+  });
+
+  const topicChartData = useMemo(() => {
+    const stats = topicStatsQuery.data || [];
+    return stats
+      .filter((s) => s.totalAttempts > 0)
+      .sort((a, b) => b.totalAttempts - a.totalAttempts)
+      .slice(0, 12)
+      .map((s) => {
+        if (granularity === "easy") {
+          const acc = s.easyAttempts ? ((s.easySolved / s.easyAttempts) * 100) : 0;
+          return { topic: s.topic, accuracy: Number(acc.toFixed(1)), attempts: s.easyAttempts, solved: s.easySolved };
+        }
+        if (granularity === "medium") {
+          const acc = s.mediumAttempts ? ((s.mediumSolved / s.mediumAttempts) * 100) : 0;
+          return { topic: s.topic, accuracy: Number(acc.toFixed(1)), attempts: s.mediumAttempts, solved: s.mediumSolved };
+        }
+        if (granularity === "hard") {
+          const acc = s.hardAttempts ? ((s.hardSolved / s.hardAttempts) * 100) : 0;
+          return { topic: s.topic, accuracy: Number(acc.toFixed(1)), attempts: s.hardAttempts, solved: s.hardSolved };
+        }
+        return { topic: s.topic, accuracy: s.accuracy, attempts: s.totalAttempts, solved: s.totalSolved };
+      });
+  }, [topicStatsQuery.data, granularity]);
 
   const report = weaknessQuery.data;
   const weakTopics = report?.weak_topics || [];
@@ -170,6 +218,64 @@ export default function WeaknessPage() {
               )}
             </div>
           </section>
+
+          {/* Per-Topic Accuracy Chart */}
+          {topicChartData.length > 0 && (
+            <section className="mt-6 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-5">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="flex items-center gap-2 text-lg font-semibold">
+                    <BarChart3 className="h-5 w-5 text-cyan-300" />
+                    Topic Accuracy
+                  </h2>
+                  <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                    Accuracy per topic — switch difficulty to drill down.
+                  </p>
+                </div>
+                <div className="flex gap-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-0.5">
+                  {(["all", "easy", "medium", "hard"] as const).map((g) => (
+                    <button
+                      key={g}
+                      type="button"
+                      onClick={() => setGranularity(g)}
+                      className={`rounded-md px-3 py-1 text-xs font-medium transition ${
+                        granularity === g
+                          ? "bg-cyan-500/20 text-cyan-300"
+                          : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                      }`}
+                    >
+                      {g === "all" ? "All" : g.charAt(0).toUpperCase() + g.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2.5">
+                {topicChartData.map((item) => (
+                  <div key={item.topic}>
+                    <div className="mb-1 flex items-center justify-between text-sm">
+                      <span className="font-medium text-[var(--text-primary)]">{item.topic}</span>
+                      <span className="text-xs text-[var(--text-muted)]">
+                        {item.solved}/{item.attempts} solved · {item.accuracy}%
+                      </span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          item.accuracy >= 70
+                            ? "bg-emerald-500"
+                            : item.accuracy >= 40
+                              ? "bg-amber-500"
+                              : "bg-rose-500"
+                        }`}
+                        style={{ width: `${Math.min(item.accuracy, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           <section className="mt-6 rounded-2xl border border-cyan-500/25 bg-cyan-500/10 p-5">
             <h2 className="text-lg font-semibold text-cyan-200">Strategy</h2>
