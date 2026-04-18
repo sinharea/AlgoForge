@@ -41,6 +41,33 @@ const postSchema = new mongoose.Schema(
       default: 0,
       index: true,
     },
+    commentCount: {
+      type: Number,
+      default: 0,
+    },
+    viewCount: {
+      type: Number,
+      default: 0,
+    },
+    isPinned: {
+      type: Boolean,
+      default: false,
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    pinnedCommentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Comment",
+      default: null,
+    },
+    acceptedCommentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Comment",
+      default: null,
+    },
   },
   { timestamps: true }
 );
@@ -48,5 +75,6 @@ const postSchema = new mongoose.Schema(
 postSchema.index({ problemId: 1, createdAt: -1 });
 postSchema.index({ problemId: 1, userId: 1, createdAt: -1 });
 postSchema.index({ problemId: 1, score: -1, createdAt: -1 });
+postSchema.index({ title: "text", content: "text", tags: "text" });
 
 module.exports = mongoose.model("Post", postSchema);

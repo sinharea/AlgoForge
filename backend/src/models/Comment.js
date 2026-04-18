@@ -1,5 +1,13 @@
 const mongoose = require("mongoose");
 
+const editHistorySchema = new mongoose.Schema(
+  {
+    content: { type: String, required: true },
+    editedAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
 const commentSchema = new mongoose.Schema(
   {
     postId: {
@@ -40,11 +48,45 @@ const commentSchema = new mongoose.Schema(
       default: 0,
       index: true,
     },
+    replyCount: {
+      type: Number,
+      default: 0,
+    },
+    depth: {
+      type: Number,
+      default: 0,
+      max: 5,
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    isEdited: {
+      type: Boolean,
+      default: false,
+    },
+    isPinned: {
+      type: Boolean,
+      default: false,
+    },
+    isAccepted: {
+      type: Boolean,
+      default: false,
+    },
+    editHistory: {
+      type: [editHistorySchema],
+      default: [],
+    },
+    mentions: [{ type: String, trim: true }],
   },
   { timestamps: true }
 );
 
 commentSchema.index({ postId: 1, createdAt: 1 });
 commentSchema.index({ postId: 1, parentId: 1, createdAt: 1 });
+commentSchema.index({ postId: 1, score: -1 });
+commentSchema.index({ userId: 1, createdAt: -1 });
+commentSchema.index({ content: "text" });
 
 module.exports = mongoose.model("Comment", commentSchema);

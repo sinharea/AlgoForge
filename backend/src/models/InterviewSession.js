@@ -62,6 +62,36 @@ const complexitySnapshotSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const codeSnapshotSchema = new mongoose.Schema(
+  {
+    code: { type: String, required: true, maxlength: 10000 },
+    language: {
+      type: String,
+      enum: ["cpp", "python", "javascript", "java", "go", "rust", "typescript"],
+      required: true,
+    },
+    createdAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
+const scoringSchema = new mongoose.Schema(
+  {
+    totalScore: { type: Number, default: 0, min: 0, max: 100 },
+    correctness: { type: Number, default: 0, min: 0, max: 25 },
+    optimality: { type: Number, default: 0, min: 0, max: 25 },
+    communication: { type: Number, default: 0, min: 0, max: 20 },
+    edgeCases: { type: Number, default: 0, min: 0, max: 15 },
+    codeQuality: { type: Number, default: 0, min: 0, max: 15 },
+    hintsUsedPenalty: { type: Number, default: 0 },
+    timePenalty: { type: Number, default: 0 },
+    feedback: { type: String, default: "" },
+    strengths: [{ type: String }],
+    weaknesses: [{ type: String }],
+  },
+  { _id: false }
+);
+
 const interviewSessionSchema = new mongoose.Schema(
   {
     userId: {
@@ -76,12 +106,22 @@ const interviewSessionSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    status: {
+      type: String,
+      enum: ["active", "completed", "abandoned"],
+      default: "active",
+      index: true,
+    },
     messages: {
       type: [interviewMessageSchema],
       default: [],
     },
     complexityComparisons: {
       type: [complexitySnapshotSchema],
+      default: [],
+    },
+    codeSnapshots: {
+      type: [codeSnapshotSchema],
       default: [],
     },
     currentStage: {
@@ -101,11 +141,24 @@ const interviewSessionSchema = new mongoose.Schema(
       turn: { type: Number, default: 0 },
       lastInterviewerQuestion: { type: String, default: "" },
     },
+    scoring: {
+      type: scoringSchema,
+      default: () => ({}),
+    },
+    duration: {
+      type: Number, // in seconds
+      default: 0,
+    },
+    endedAt: {
+      type: Date,
+      default: null,
+    },
   },
-  { timestamps: { createdAt: true, updatedAt: false }, collection: "interview_sessions" }
+  { timestamps: { createdAt: true, updatedAt: true }, collection: "interview_sessions" }
 );
 
 interviewSessionSchema.index({ userId: 1, createdAt: -1 });
 interviewSessionSchema.index({ userId: 1, problemId: 1, createdAt: -1 });
+interviewSessionSchema.index({ userId: 1, status: 1 });
 
 module.exports = mongoose.model("InterviewSession", interviewSessionSchema);

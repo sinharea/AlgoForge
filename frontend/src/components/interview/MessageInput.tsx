@@ -97,7 +97,7 @@ export default function MessageInput({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="mt-4 space-y-2">
+    <form onSubmit={handleSubmit} className="space-y-2">
       <div className="flex gap-2">
         <input
           type="text"

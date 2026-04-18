@@ -5,6 +5,10 @@ const {
   compareInterviewSessionComplexity,
   getInterviewSession,
   getInterviewSessionMessages,
+  endInterviewSession,
+  saveCodeSnapshot,
+  getInterviewHistory,
+  getInterviewStats,
 } = require("../services/interviewService");
 
 const startInterview = asyncHandler(async (req, res) => {
@@ -58,10 +62,51 @@ const getInterviewMessages = asyncHandler(async (req, res) => {
   res.json(data);
 });
 
+const endInterview = asyncHandler(async (req, res) => {
+  const data = await endInterviewSession({
+    userId: req.user._id,
+    sessionId: req.body.sessionId,
+    status: req.body.status,
+  });
+
+  res.json(data);
+});
+
+const saveCode = asyncHandler(async (req, res) => {
+  const data = await saveCodeSnapshot({
+    userId: req.user._id,
+    sessionId: req.body.sessionId,
+    code: req.body.code,
+    language: req.body.language,
+  });
+
+  res.json(data);
+});
+
+const getHistory = asyncHandler(async (req, res) => {
+  const data = await getInterviewHistory({
+    userId: req.user._id,
+    page: req.query.page,
+    limit: req.query.limit,
+    status: req.query.status,
+  });
+
+  res.json(data);
+});
+
+const getStats = asyncHandler(async (req, res) => {
+  const data = await getInterviewStats({ userId: req.user._id });
+  res.json(data);
+});
+
 module.exports = {
   startInterview,
   respondInterview,
   compareInterviewComplexity,
   getInterviewById,
   getInterviewMessages,
+  endInterview,
+  saveCode,
+  getHistory,
+  getStats,
 };

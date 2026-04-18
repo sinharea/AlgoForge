@@ -16,11 +16,17 @@ const {
   getAllProblems,
   getProblemById,
   getProblemBySlug,
+  getHints,
+  getEditorial,
+  getSimilarProblems,
   updateProblem,
 } = require("../controllers/problemController");
 
 router.get("/", validate(problemQuerySchema, "query"), getAllProblems);
 router.get("/slug/:slug", getProblemBySlug);
+router.get("/slug/:slug/hints", auth, getHints);
+router.get("/slug/:slug/editorial", auth, getEditorial);
+router.get("/slug/:slug/similar", getSimilarProblems);
 router.get("/:id", getProblemById);
 
 router.post(

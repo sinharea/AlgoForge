@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Loader2, MessageSquarePlus } from "lucide-react";
+import { ArrowLeft, Loader2, MessageSquarePlus, Search, TrendingUp, Flame, Clock } from "lucide-react";
+import { clsx } from "clsx";
 import toast from "react-hot-toast";
 import { problemApi } from "@/src/api/problemApi";
 import { communityApi, CommunitySort } from "@/src/api/communityApi";
@@ -37,6 +38,7 @@ export default function ProblemDiscussPage() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [tags, setTags] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [voteLoadingId, setVoteLoadingId] = useState<string | null>(null);
 
   const problemQuery = useQuery({
@@ -48,7 +50,7 @@ export default function ProblemDiscussPage() {
   const problemId = problemQuery.data?._id as string | undefined;
 
   const postsQuery = useInfiniteQuery({
-    queryKey: ["community-posts", problemId, sort],
+    queryKey: ["community-posts", problemId, sort, searchQuery],
     enabled: Boolean(problemId),
     initialPageParam: 1,
     queryFn: async ({ pageParam }) =>
@@ -58,6 +60,7 @@ export default function ProblemDiscussPage() {
           page: Number(pageParam),
           limit: 10,
           sort,
+          search: searchQuery || undefined,
         })
       ).data,
     getNextPageParam: (lastPage) => (lastPage.hasMore ? lastPage.page + 1 : undefined),
@@ -211,16 +214,41 @@ export default function ProblemDiscussPage() {
         </div>
       )}
 
-      <div className="mb-4 flex items-center justify-between gap-2">
-        <p className="text-sm text-[var(--text-secondary)]">{posts.length} posts loaded</p>
-        <select
-          value={sort}
-          onChange={(event) => setSort(event.target.value as CommunitySort)}
-          className="input select max-w-[200px]"
-        >
-          <option value="newest">Newest</option>
-          <option value="most_votes">Most votes</option>
-        </select>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search discussions..."
+            className="input w-full pl-9"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <p className="text-sm text-[var(--text-secondary)]">{posts.length} posts</p>
+          <div className="flex rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)]">
+            {([
+              { value: "newest" as const, icon: Clock, label: "New" },
+              { value: "most_votes" as const, icon: TrendingUp, label: "Top" },
+              { value: "hot" as const, icon: Flame, label: "Hot" },
+            ]).map((item) => (
+              <button
+                key={item.value}
+                onClick={() => setSort(item.value)}
+                className={clsx(
+                  "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors",
+                  sort === item.value
+                    ? "bg-[var(--accent-primary)]/15 text-[var(--accent-secondary)]"
+                    : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                )}
+              >
+                <item.icon className="h-3.5 w-3.5" />
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {postsQuery.isError && (

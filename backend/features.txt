@@ -1,0 +1,399 @@
+COMMENT SYSTEM FEATURES
+
+1. BASIC
+
+* Create comment
+* Edit comment
+* Delete comment (soft delete)
+* View comments per post
+* Pagination / infinite scroll
+
+2. THREADING (REPLIES)
+
+* Parent comment support (parentId)
+* Nested replies
+* Depth limit (e.g., max depth = 5)
+* Expand / collapse replies
+
+3. VOTING SYSTEM
+
+* Upvote / Downvote
+* Prevent multiple votes per user
+* Toggle vote (upvote → remove → downvote)
+* Maintain score (upvotes - downvotes)
+* Sort by top / newest / oldest
+
+4. USER FEATURES
+
+* Show user info (name, avatar)
+* Highlight author (OP badge)
+* Mention users (@username)
+* User-specific comment history
+
+5. MODERATION
+
+* Soft delete (isDeleted flag)
+* Admin delete / restore
+* Report comment
+* Spam detection (rate limiting)
+* Profanity filter (optional)
+
+6. PERFORMANCE OPTIMIZATION
+
+* replyCount (avoid count queries)
+* Indexing (postId, parentId, score)
+* Lazy loading replies
+* Caching (optional)
+
+7. SEARCH & FILTER
+
+* Full-text search in comments
+* Filter by user
+* Filter by time (recent)
+
+8. NOTIFICATIONS
+
+* Notify on reply
+* Notify on mention (@user)
+* Notify on upvote (optional)
+
+9. REAL-TIME (OPTIONAL)
+
+* Live comments update (WebSocket)
+* Live vote count updates
+
+10. SECURITY
+
+* Rate limiting (prevent spam)
+* Input sanitization (XSS protection)
+* Auth required for actions
+
+11. ANALYTICS (OPTIONAL)
+
+* Track most active users
+* Track most commented posts
+* Engagement metrics
+
+12. UI/UX FEATURES
+
+* Markdown support (optional)
+* Code block support (important for AlgoForge)
+* Like/dislike buttons
+* Reply button
+* Collapsible threads
+
+13. ADVANCED (NEXT LEVEL)
+
+* Pin comment
+* Highlight accepted answer
+* Sort by "hot" (Reddit-style ranking)
+* Edit history (versioning)
+* Anonymous comments (optional)
+
+
+INTERVIEW SESSION SYSTEM REQUIREMENTS
+
+1. SESSION MANAGEMENT
+
+* Start interview session (userId + problemId)
+* Resume existing session
+* End session (completed / abandoned)
+* Track session status (active, completed, abandoned)
+* Track session duration (start → end time)
+* Allow multiple sessions per user per problem (history)
+
+2. INTERVIEW FLOW (STATE MACHINE)
+
+* Stages:
+
+  * approach
+  * complexity
+  * edge_cases
+  * optimization
+  * coding
+* Enforce stage transitions
+* Allow backward/forward transitions (optional)
+* Track current stage
+* Maintain per-stage progress
+
+3. CHAT SYSTEM (CORE)
+
+* Store messages (interviewer ↔ user)
+* Roles: interviewer, user
+* Maintain chronological order
+* Support long conversations (scalable storage)
+* Track message count
+* Track last message timestamp
+* Pagination for messages (if large)
+
+4. AI INTERVIEWER BEHAVIOR
+
+* Ask questions based on current stage
+* Give hints when user is stuck
+* Detect user confusion / struggle
+* Adapt difficulty dynamically
+* Avoid giving full solution directly
+* Maintain conversational context
+
+5. USER STATE TRACKING
+
+* Track:
+
+  * hintsGiven
+  * stuckCount
+  * struggleCount
+  * turn count
+* Detect:
+
+  * userStuck (boolean)
+* Store:
+
+  * lastInterviewerQuestion
+  * lastComplexityComparedAt
+* Maintain stage mastery score (0 → 1)
+
+6. COMPLEXITY ANALYSIS SYSTEM
+
+* Capture user solution
+* Capture user-estimated complexity:
+
+  * time
+  * space
+  * confidence (0–1)
+  * rationale
+* Store optimal complexity:
+
+  * time
+  * space
+  * source (problem_data / ai_generated)
+  * rationale
+* Compare user vs optimal:
+
+  * verdict (better / equal / worse / unknown)
+  * summary
+  * recommendation
+* Maintain history of comparisons
+
+7. CODE TRACKING (CODING STAGE)
+
+* Store user code submissions
+* Track code evolution (snapshots)
+* Store language used (cpp/java/python/js)
+* Optional: run test cases
+* Optional: evaluate correctness
+
+8. SCORING SYSTEM
+
+* Assign final score (0–100)
+* Factors:
+
+  * correctness
+  * optimality
+  * hints used
+  * time taken
+  * number of struggles
+* Provide feedback summary
+
+9. PERFORMANCE & SCALABILITY
+
+* Separate collections for:
+
+  * messages
+  * complexity snapshots (optional)
+* Avoid large document growth (16MB limit)
+* Index:
+
+  * userId
+  * problemId
+  * status
+  * createdAt
+* Support high read/write throughput
+
+10. ANALYTICS & INSIGHTS
+
+* Track:
+
+  * total sessions per user
+  * success rate
+  * average score
+  * most difficult problems
+* Track per-stage performance
+* Identify weak areas (e.g., complexity, coding)
+
+11. NOTIFICATIONS (OPTIONAL)
+
+* Notify user when session ends
+* Notify on feedback ready
+* Reminders for incomplete sessions
+
+12. SECURITY & VALIDATION
+
+* Auth required for session access
+* Validate user ownership of session
+* Input sanitization
+* Rate limiting (prevent abuse)
+
+13. UI/UX FEATURES
+
+* Chat-like interface
+* Stage progress indicator
+* Show hints progressively
+* Show feedback after completion
+* Show complexity comparison visually
+* Code editor integration (Monaco, etc.)
+
+14. ADVANCED FEATURES (NEXT LEVEL)
+
+* Real-time AI interviewer (streaming responses)
+* Voice-based interview (optional)
+* Replay past sessions
+* Share session (public/private)
+* Leaderboard based on scores
+* Mock interview mode (timed)
+* Adaptive difficulty based on user skill
+
+15. SYSTEM DESIGN EXTENSIONS
+
+* Plug different AI models (modular)
+* Prompt templates per stage
+* Configurable interview flow
+* A/B testing for AI behavior
+
+
+PROBLEM SYSTEM REQUIREMENTS
+
+1. BASIC PROBLEM INFO
+
+* Unique problem title
+* Unique slug (URL-friendly identifier)
+* Optional question number (for ordering)
+* Difficulty levels (easy, medium, hard)
+* Full problem description
+* Constraints section
+
+2. PROBLEM CONTENT
+
+* Description supports rich text (Markdown/HTML)
+* Constraints clearly defined
+* Examples included (sample test cases)
+* Multiple sample inputs/outputs supported
+
+3. TEST CASE SYSTEM
+
+* Store:
+
+  * sample test cases (visible to user)
+  * hidden test cases (used for evaluation)
+* Each test case:
+
+  * input
+  * expected output
+* Maintain hidden test case count
+* Support large input sizes
+* Prevent exposure of hidden test cases
+
+4. EVALUATION CONFIG
+
+* Time limit per test case (ms)
+* Memory limit (MB)
+* Language-specific constraints (optional)
+* Support multiple languages (cpp, java, python, js)
+
+5. EDITORIAL & SOLUTIONS
+
+* Store editorial solution (explanation)
+* Store optimal solution approach
+* Store optimal complexity:
+
+  * time complexity
+  * space complexity
+  * notes/explanation
+* Control visibility (locked until solved, optional)
+
+6. TAGGING & FILTERING
+
+* Add tags (array of strings)
+* Normalize tags (lowercase)
+* Filter problems by:
+
+  * tags
+  * difficulty
+  * keyword search (text index)
+
+7. SEARCH SYSTEM
+
+* Full-text search on:
+
+  * title
+  * description
+  * tags
+* Support keyword-based filtering
+* Fast lookup via slug
+
+8. INDEXING & PERFORMANCE
+
+* Index:
+
+  * slug (unique)
+  * difficulty
+  * tags
+  * questionNumber (unique, sparse)
+* Optimize for:
+
+  * listing problems
+  * filtering
+  * searching
+
+9. VERSIONING & UPDATES (OPTIONAL)
+
+* Track updates to problem
+* Maintain version history (optional)
+* Allow admin edits
+
+10. SECURITY & VALIDATION
+
+* Validate test case format
+* Sanitize inputs (prevent injection)
+* Restrict access to hidden test cases
+* Role-based access (admin vs user)
+
+11. ANALYTICS (OPTIONAL)
+
+* Track:
+
+  * number of submissions
+  * acceptance rate
+  * average solve time
+* Track user performance per problem
+
+12. UI/UX FEATURES
+
+* Problem statement page
+* Code editor integration
+* Run code on sample test cases
+* Submit solution button
+* Show results (AC / WA / TLE / MLE)
+
+13. ADVANCED FEATURES (NEXT LEVEL)
+
+* Company tags (e.g., Amazon, Google)
+* Similar problems recommendation
+* Difficulty rating adjustment (based on user data)
+* Hints system (progressive hints)
+* Interactive problems (custom input)
+* Visualizers (graphs, trees, etc.)
+
+14. DISCUSSION INTEGRATION
+
+* Link problem to discussion posts
+* Show related posts/comments
+* Allow asking questions per problem
+
+15. SYSTEM DESIGN EXTENSIONS
+
+* Separate test case storage service (for scale)
+* Code execution service (sandboxed)
+* Distributed judging system (for heavy load)
+* Pluggable judge architecture
+
+

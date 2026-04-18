@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import toast from "react-hot-toast";
 import { clsx } from "clsx";
-import { Clock, Tag, Copy, Check, BookOpen, FileCode, TestTube, CheckCircle2, XCircle, AlertTriangle, Loader2, ShieldCheck, Hash, Scale } from "lucide-react";
+import { Clock, Tag, Copy, Check, BookOpen, FileCode, TestTube, CheckCircle2, XCircle, AlertTriangle, Loader2, ShieldCheck, Hash, Scale, Lightbulb, GraduationCap, Sparkles } from "lucide-react";
 import { problemApi, RunResult } from "@/src/api/problemApi";
 import { interviewApi, InterviewComplexityComparison } from "@/src/api/interviewApi";
 import CodePlayground from "@/src/features/editor/CodePlayground";
@@ -108,7 +108,7 @@ export default function ProblemDetailPage() {
   const [submissionId, setSubmissionId] = useState<string | null>(null);
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<"description" | "submissions">("description");
+  const [activeTab, setActiveTab] = useState<"description" | "submissions" | "hints" | "editorial">("description");
   const [activeTestTab, setActiveTestTab] = useState<"samples" | "custom">("samples");
   const [customInput, setCustomInput] = useState("");
   const [runResults, setRunResults] = useState<RunResult[]>([]);
@@ -117,6 +117,7 @@ export default function ProblemDetailPage() {
   const [languageInitialized, setLanguageInitialized] = useState(false);
   const [latestComplexityComparison, setLatestComplexityComparison] = useState<InterviewComplexityComparison | null>(null);
   const [activeInterviewSessionId, setActiveInterviewSessionId] = useState<string | null>(null);
+  const [revealedHintLevel, setRevealedHintLevel] = useState(0);
 
   // Load saved code from localStorage on mount and when slug/language changes
   useEffect(() => {
@@ -162,6 +163,24 @@ export default function ProblemDetailPage() {
   const problemQuery = useQuery({
     queryKey: ["problem", slug],
     queryFn: async () => (await problemApi.getBySlug(slug)).data,
+    enabled: Boolean(slug),
+  });
+
+  const hintsQuery = useQuery({
+    queryKey: ["problem-hints", slug],
+    queryFn: async () => (await problemApi.getHints(slug)).data,
+    enabled: activeTab === "hints" && Boolean(slug),
+  });
+
+  const editorialQuery = useQuery({
+    queryKey: ["problem-editorial", slug],
+    queryFn: async () => (await problemApi.getEditorial(slug)).data,
+    enabled: activeTab === "editorial" && Boolean(slug),
+  });
+
+  const similarQuery = useQuery({
+    queryKey: ["problem-similar", slug],
+    queryFn: async () => (await problemApi.getSimilarProblems(slug)).data,
     enabled: Boolean(slug),
   });
 
@@ -495,11 +514,11 @@ export default function ProblemDetailPage() {
                 </div>
               </div>
 
-              <div className="mb-4 flex gap-1 border-b border-[var(--border-color)]">
+              <div className="mb-4 flex gap-1 border-b border-[var(--border-color)] overflow-x-auto">
                 <button
                   onClick={() => setActiveTab("description")}
                   className={clsx(
-                    "flex items-center gap-2 border-b-2 px-4 py-2 text-sm font-medium transition-colors",
+                    "flex items-center gap-2 border-b-2 px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap",
                     activeTab === "description"
                       ? "border-[var(--accent-primary)] text-[var(--accent-secondary)]"
                       : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
@@ -509,9 +528,33 @@ export default function ProblemDetailPage() {
                   Description
                 </button>
                 <button
+                  onClick={() => setActiveTab("hints")}
+                  className={clsx(
+                    "flex items-center gap-2 border-b-2 px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap",
+                    activeTab === "hints"
+                      ? "border-amber-400 text-amber-300"
+                      : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                  )}
+                >
+                  <Lightbulb className="h-4 w-4" />
+                  Hints
+                </button>
+                <button
+                  onClick={() => setActiveTab("editorial")}
+                  className={clsx(
+                    "flex items-center gap-2 border-b-2 px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap",
+                    activeTab === "editorial"
+                      ? "border-emerald-400 text-emerald-300"
+                      : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                  )}
+                >
+                  <GraduationCap className="h-4 w-4" />
+                  Editorial
+                </button>
+                <button
                   onClick={() => setActiveTab("submissions")}
                   className={clsx(
-                    "flex items-center gap-2 border-b-2 px-4 py-2 text-sm font-medium transition-colors",
+                    "flex items-center gap-2 border-b-2 px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap",
                     activeTab === "submissions"
                       ? "border-[var(--accent-primary)] text-[var(--accent-secondary)]"
                       : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
@@ -593,6 +636,159 @@ export default function ProblemDetailPage() {
                               </div>
                             </div>
                           </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeTab === "hints" && (
+                <div className="space-y-4">
+                  {hintsQuery.isLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-5 w-5 animate-spin text-amber-400" />
+                    </div>
+                  ) : (hintsQuery.data?.hints || []).length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-10 text-center">
+                      <Lightbulb className="mb-3 h-10 w-10 text-amber-400/40" />
+                      <p className="text-[var(--text-muted)]">No hints available for this problem yet.</p>
+                      <p className="mt-1 text-xs text-[var(--text-muted)]">Try working through it on your own!</p>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-sm text-[var(--text-secondary)]">
+                        Reveal hints progressively. Try solving on your own first!
+                      </p>
+                      <div className="space-y-3">
+                        {(hintsQuery.data?.hints || []).map((hint, idx) => (
+                          <div
+                            key={idx}
+                            className={clsx(
+                              "rounded-xl border transition-all duration-300",
+                              revealedHintLevel >= hint.level
+                                ? "border-amber-500/30 bg-amber-500/8"
+                                : "border-[var(--border-color)] bg-[var(--bg-primary)]"
+                            )}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => setRevealedHintLevel(Math.max(revealedHintLevel, hint.level))}
+                              className="flex w-full items-center justify-between px-4 py-3 text-left"
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className={clsx(
+                                  "inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold",
+                                  revealedHintLevel >= hint.level
+                                    ? "bg-amber-500/20 text-amber-300"
+                                    : "bg-[var(--bg-tertiary)] text-[var(--text-muted)]"
+                                )}>
+                                  {hint.level}
+                                </span>
+                                <span className="text-sm font-medium">
+                                  {hint.type === "approach" ? "Approach Hint" :
+                                   hint.type === "algorithm" ? "Algorithm Hint" :
+                                   hint.type === "code" ? "Code Hint" : "Edge Case Hint"}
+                                </span>
+                              </div>
+                              {revealedHintLevel < hint.level && (
+                                <span className="text-xs text-amber-400">Click to reveal</span>
+                              )}
+                            </button>
+                            {revealedHintLevel >= hint.level && (
+                              <div className="border-t border-amber-500/20 px-4 py-3">
+                                <p className="whitespace-pre-wrap text-sm text-[var(--text-secondary)] leading-relaxed">
+                                  {hint.content}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-[var(--text-muted)]">
+                        {revealedHintLevel}/{hintsQuery.data?.total || 0} hints revealed
+                      </p>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {activeTab === "editorial" && (
+                <div className="space-y-6">
+                  {editorialQuery.isLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-5 w-5 animate-spin text-emerald-400" />
+                    </div>
+                  ) : !editorialQuery.data?.editorial && !editorialQuery.data?.approach ? (
+                    <div className="flex flex-col items-center justify-center py-10 text-center">
+                      <GraduationCap className="mb-3 h-10 w-10 text-emerald-400/40" />
+                      <p className="text-[var(--text-muted)]">No editorial available yet.</p>
+                    </div>
+                  ) : (
+                    <>
+                      {editorialQuery.data?.approach && (
+                        <div>
+                          <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-emerald-300">
+                            <Sparkles className="h-4 w-4" />
+                            Approach
+                          </h3>
+                          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                            <p className="whitespace-pre-wrap text-sm text-[var(--text-secondary)] leading-relaxed">
+                              {editorialQuery.data.approach}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {editorialQuery.data?.optimalComplexity && (
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3">
+                            <p className="text-xs font-medium uppercase tracking-wide text-cyan-300/80">Time Complexity</p>
+                            <p className="mt-1 text-lg font-semibold text-cyan-200">{editorialQuery.data.optimalComplexity.time || "—"}</p>
+                          </div>
+                          <div className="rounded-lg border border-violet-500/20 bg-violet-500/5 p-3">
+                            <p className="text-xs font-medium uppercase tracking-wide text-violet-300/80">Space Complexity</p>
+                            <p className="mt-1 text-lg font-semibold text-violet-200">{editorialQuery.data.optimalComplexity.space || "—"}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {editorialQuery.data?.editorial && (
+                        <div>
+                          <h3 className="mb-2 text-sm font-semibold text-emerald-300">Solution</h3>
+                          <pre className="max-h-96 overflow-auto rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] p-4 text-sm text-[var(--text-secondary)] leading-relaxed">
+                            {editorialQuery.data.editorial}
+                          </pre>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {(similarQuery.data?.similar || []).length > 0 && (
+                    <div>
+                      <h3 className="mb-3 text-sm font-semibold text-[var(--text-primary)]">Similar Problems</h3>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {similarQuery.data!.similar.map((p) => (
+                          <Link
+                            key={p._id}
+                            href={`/problems/${p.slug}`}
+                            className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-3 transition hover:border-[var(--accent-primary)]/50"
+                          >
+                            <p className="text-sm font-medium">{p.title}</p>
+                            <div className="mt-1 flex items-center gap-2">
+                              <span className={clsx(
+                                "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                                p.difficulty === "Easy" && "bg-emerald-500/15 text-emerald-300",
+                                p.difficulty === "Medium" && "bg-amber-500/15 text-amber-300",
+                                p.difficulty === "Hard" && "bg-rose-500/15 text-rose-300"
+                              )}>
+                                {p.difficulty}
+                              </span>
+                              {p.tags?.slice(0, 2).map((t) => (
+                                <span key={t} className="text-[10px] text-[var(--text-muted)]">{t}</span>
+                              ))}
+                            </div>
+                          </Link>
                         ))}
                       </div>
                     </div>

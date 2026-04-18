@@ -781,4 +781,177 @@ module.exports = {
   compareInterviewSessionComplexity,
   getInterviewSession,
   getInterviewSessionMessages,
+  endInterviewSession,
+  saveCodeSnapshot,
+  getInterviewHistory,
+  getInterviewStats,
 };
+
+async function endInterviewSession({ userId, sessionId, status = "completed" }) {
+  const session = await InterviewSession.findById(sessionId);
+  if (!session) throw ApiError.notFound("Interview session not found");
+  if (String(session.userId) !== String(userId)) throw ApiError.forbidden("Not your session");
+  if (session.status !== "active") throw ApiError.badRequest("Session is already ended");
+
+  session.status = status;
+  session.endedAt = new Date();
+  session.duration = Math.round((session.endedAt - session.createdAt) / 1000);
+
+  // Calculate scoring
+  const state = session.currentState || {};
+  const stages = ["approach", "complexity", "edge_cases", "optimization", "coding"];
+  const stageIndex = stages.indexOf(session.currentStage);
+  const stageProgress = Math.min((stageIndex + 1) / stages.length, 1);
+
+  let correctness = Math.round(stageProgress * 25);
+  let optimality = 0;
+  let communication = 0;
+  let edgeCases = 0;
+  let codeQuality = 0;
+
+  // Optimality: based on complexity comparisons
+  const comparisons = session.complexityComparisons || [];
+  if (comparisons.length > 0) {
+    const lastComparison = comparisons[comparisons.length - 1];
+    if (lastComparison.comparison.verdict === "equal" || lastComparison.comparison.verdict === "better") {
+      optimality = 25;
+    } else if (lastComparison.comparison.verdict === "worse") {
+      optimality = 10;
+    } else {
+      optimality = 5;
+    }
+  }
+
+  // Communication: based on message count and struggle ratio
+  const userMessages = (session.messages || []).filter((m) => m.role === "user");
+  const struggleRatio = userMessages.length > 0 ? (state.struggleCount || 0) / userMessages.length : 1;
+  communication = Math.round(Math.max(0, 20 * (1 - struggleRatio)));
+
+  // Edge cases: partial if they reached that stage
+  if (stageIndex >= 2) edgeCases = 15;
+  else if (stageIndex >= 1) edgeCases = 7;
+
+  // Code quality: if they reached coding stage
+  if (stageIndex >= 4) codeQuality = 15;
+  else if (stageIndex >= 3) codeQuality = 7;
+
+  // Penalties
+  const hintsUsedPenalty = Math.min((state.hintsGiven || 0) * 3, 15);
+  const timePenalty = session.duration > 3600 ? 10 : session.duration > 1800 ? 5 : 0;
+
+  const totalScore = Math.max(0, Math.min(100,
+    correctness + optimality + communication + edgeCases + codeQuality - hintsUsedPenalty - timePenalty
+  ));
+
+  const strengths = [];
+  const weaknesses = [];
+  if (correctness >= 20) strengths.push("Strong problem-solving approach");
+  if (optimality >= 20) strengths.push("Good complexity optimization");
+  if (communication >= 15) strengths.push("Clear communication");
+  if (correctness < 15) weaknesses.push("Needs work on approaching problems");
+  if (optimality < 10) weaknesses.push("Complexity analysis needs improvement");
+  if (communication < 10) weaknesses.push("Communication could be clearer");
+
+  session.scoring = {
+    totalScore,
+    correctness,
+    optimality,
+    communication,
+    edgeCases,
+    codeQuality,
+    hintsUsedPenalty,
+    timePenalty,
+    feedback: totalScore >= 70 ? "Great performance! You showed solid problem-solving skills." :
+              totalScore >= 40 ? "Good attempt. Focus on the areas marked as weaknesses." :
+              "Keep practicing. Review the feedback and try again.",
+    strengths,
+    weaknesses,
+  };
+
+  await session.save();
+
+  return {
+    sessionId: session._id,
+    status: session.status,
+    duration: session.duration,
+    scoring: session.scoring,
+  };
+}
+
+async function saveCodeSnapshot({ userId, sessionId, code, language }) {
+  const session = await InterviewSession.findById(sessionId).select("userId status codeSnapshots");
+  if (!session) throw ApiError.notFound("Interview session not found");
+  if (String(session.userId) !== String(userId)) throw ApiError.forbidden("Not your session");
+
+  if (session.codeSnapshots.length >= 50) {
+    session.codeSnapshots.shift();
+  }
+
+  session.codeSnapshots.push({ code, language });
+  await session.save();
+
+  return { success: true, snapshotCount: session.codeSnapshots.length };
+}
+
+async function getInterviewHistory({ userId, page = 1, limit = 10, status = "all" }) {
+  const safePage = Math.max(1, Number(page) || 1);
+  const safeLimit = Math.min(50, Math.max(1, Number(limit) || 10));
+  const skip = (safePage - 1) * safeLimit;
+
+  const filter = { userId };
+  if (status !== "all") filter.status = status;
+
+  const [sessions, total] = await Promise.all([
+    InterviewSession.find(filter)
+      .populate("problemId", "title slug difficulty")
+      .select("problemId status currentStage scoring.totalScore duration createdAt endedAt")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(safeLimit)
+      .lean(),
+    InterviewSession.countDocuments(filter),
+  ]);
+
+  return {
+    items: sessions.map((s) => ({
+      sessionId: s._id,
+      problem: s.problemId ? {
+        id: s.problemId._id,
+        title: s.problemId.title,
+        slug: s.problemId.slug,
+        difficulty: s.problemId.difficulty,
+      } : null,
+      status: s.status,
+      currentStage: s.currentStage,
+      score: s.scoring?.totalScore || 0,
+      duration: s.duration || 0,
+      createdAt: s.createdAt,
+      endedAt: s.endedAt,
+    })),
+    total,
+    page: safePage,
+    pages: Math.max(1, Math.ceil(total / safeLimit)),
+  };
+}
+
+async function getInterviewStats({ userId }) {
+  const [totalSessions, completed, avgScoreResult] = await Promise.all([
+    InterviewSession.countDocuments({ userId }),
+    InterviewSession.countDocuments({ userId, status: "completed" }),
+    InterviewSession.aggregate([
+      { $match: { userId: new (require("mongoose").Types.ObjectId)(userId), status: "completed" } },
+      { $group: { _id: null, avgScore: { $avg: "$scoring.totalScore" }, avgDuration: { $avg: "$duration" } } },
+    ]),
+  ]);
+
+  const stats = avgScoreResult[0] || { avgScore: 0, avgDuration: 0 };
+
+  return {
+    totalSessions,
+    completed,
+    abandoned: totalSessions - completed,
+    successRate: totalSessions > 0 ? Math.round((completed / totalSessions) * 100) : 0,
+    averageScore: Math.round(stats.avgScore || 0),
+    averageDuration: Math.round(stats.avgDuration || 0),
+  };
+}

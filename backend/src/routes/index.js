@@ -10,6 +10,7 @@ const adminRoutes = require("./adminRoutes");
 const userRoutes = require("./userRoutes");
 const interviewRoutes = require("./interviewRoutes");
 const traceRoutes = require("./traceRoutes");
+const notificationRoutes = require("./notificationRoutes");
 
 const router = express.Router();
 
@@ -24,5 +25,6 @@ router.use("/admin", adminRoutes);
 router.use("/user", userRoutes);
 router.use("/interview", interviewRoutes);
 router.use("/trace", traceRoutes);
+router.use("/notifications", notificationRoutes);
 
 module.exports = router;

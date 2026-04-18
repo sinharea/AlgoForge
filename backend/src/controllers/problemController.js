@@ -13,7 +13,7 @@ const getAllProblems = asyncHandler(async (req, res) => {
 
   const [items, total] = await Promise.all([
     Problem.find(filter)
-      .select("questionNumber title slug difficulty tags hiddenTestCaseCount")
+      .select("questionNumber title slug difficulty tags companyTags hiddenTestCaseCount submissionCount acceptedCount")
       .skip((page - 1) * limit)
       .limit(limit)
       .sort({ questionNumber: 1, createdAt: -1 }),
@@ -30,15 +30,68 @@ const getAllProblems = asyncHandler(async (req, res) => {
 });
 
 const getProblemById = asyncHandler(async (req, res) => {
-  const problem = await Problem.findById(req.params.id).select("-testCases -editorialSolution");
+  const problem = await Problem.findById(req.params.id).select("-testCases -editorialSolution -editorialApproach");
   if (!problem) throw new ApiError(404, "Problem not found");
   res.json(problem);
 });
 
 const getProblemBySlug = asyncHandler(async (req, res) => {
-  const problem = await Problem.findOne({ slug: req.params.slug }).select("-testCases -editorialSolution");
+  const problem = await Problem.findOne({ slug: req.params.slug }).select("-testCases -editorialSolution -editorialApproach");
   if (!problem) throw new ApiError(404, "Problem not found");
   res.json(problem);
+});
+
+const getHints = asyncHandler(async (req, res) => {
+  const problem = await Problem.findOne({ slug: req.params.slug }).select("hints");
+  if (!problem) throw new ApiError(404, "Problem not found");
+
+  const level = Number(req.query.level) || 0;
+  const hints = (problem.hints || [])
+    .filter((h) => level === 0 || h.level <= level)
+    .sort((a, b) => a.level - b.level);
+
+  res.json({ hints, total: problem.hints?.length || 0 });
+});
+
+const getEditorial = asyncHandler(async (req, res) => {
+  const problem = await Problem.findOne({ slug: req.params.slug })
+    .select("editorialSolution editorialApproach optimalComplexity");
+  if (!problem) throw new ApiError(404, "Problem not found");
+
+  res.json({
+    editorial: problem.editorialSolution || "",
+    approach: problem.editorialApproach || "",
+    optimalComplexity: problem.optimalComplexity || {},
+  });
+});
+
+const getSimilarProblems = asyncHandler(async (req, res) => {
+  const problem = await Problem.findOne({ slug: req.params.slug }).select("tags difficulty similarProblems");
+  if (!problem) throw new ApiError(404, "Problem not found");
+
+  let similar = [];
+  if (problem.similarProblems?.length) {
+    similar = await Problem.find({ _id: { $in: problem.similarProblems } })
+      .select("title slug difficulty tags")
+      .limit(6)
+      .lean();
+  }
+
+  if (similar.length < 6 && problem.tags?.length) {
+    const extraIds = similar.map((s) => s._id);
+    extraIds.push(problem._id);
+    const extra = await Problem.find({
+      _id: { $nin: extraIds },
+      tags: { $in: problem.tags },
+      difficulty: problem.difficulty,
+    })
+      .select("title slug difficulty tags")
+      .limit(6 - similar.length)
+      .lean();
+    similar.push(...extra);
+  }
+
+  res.json({ similar });
 });
 
 const createProblemHandler = asyncHandler(async (req, res) => {
@@ -61,6 +114,9 @@ module.exports = {
   getAllProblems,
   getProblemById,
   getProblemBySlug,
+  getHints,
+  getEditorial,
+  getSimilarProblems,
   createProblem: createProblemHandler,
   updateProblem: updateProblemHandler,
   deleteProblem,

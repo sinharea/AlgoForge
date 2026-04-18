@@ -35,6 +35,20 @@ export type InterviewComplexityCompareResponse = {
   latestComplexityComparison: InterviewComplexityComparison | null;
 };
 
+export type InterviewScoring = {
+  totalScore: number;
+  correctness: number;
+  optimality: number;
+  communication: number;
+  edgeCases: number;
+  codeQuality: number;
+  hintsUsedPenalty: number;
+  timePenalty: number;
+  feedback: string;
+  strengths: string[];
+  weaknesses: string[];
+};
+
 export type InterviewSessionResponse = {
   sessionId: string;
   problem: {
@@ -44,6 +58,7 @@ export type InterviewSessionResponse = {
     difficulty: string;
   };
   messages: InterviewMessage[];
+  status: "active" | "completed" | "abandoned";
   currentStage: "approach" | "complexity" | "edge_cases" | "optimization" | "coding";
   currentState: {
     phase: string;
@@ -55,8 +70,36 @@ export type InterviewSessionResponse = {
     lastComplexityComparedAt?: string | null;
     turn: number;
   };
+  scoring?: InterviewScoring;
+  duration?: number;
   latestComplexityComparison?: InterviewComplexityComparison | null;
   createdAt: string;
+  endedAt?: string;
+};
+
+export type InterviewHistoryItem = {
+  sessionId: string;
+  problem: {
+    id: string;
+    title: string;
+    slug: string;
+    difficulty: string;
+  } | null;
+  status: string;
+  currentStage: string;
+  score: number;
+  duration: number;
+  createdAt: string;
+  endedAt: string | null;
+};
+
+export type InterviewStats = {
+  totalSessions: number;
+  completed: number;
+  abandoned: number;
+  successRate: number;
+  averageScore: number;
+  averageDuration: number;
 };
 
 export const interviewApi = {
@@ -65,5 +108,12 @@ export const interviewApi = {
     api.post<InterviewSessionResponse>("/interview/respond", payload),
   compare: (payload: { sessionId: string; userSolution?: string }) =>
     api.post<InterviewComplexityCompareResponse>("/interview/compare", payload),
+  end: (payload: { sessionId: string; status?: "completed" | "abandoned" }) =>
+    api.post<{ sessionId: string; status: string; duration: number; scoring: InterviewScoring }>("/interview/end", payload),
+  saveCode: (payload: { sessionId: string; code: string; language: string }) =>
+    api.post("/interview/code-snapshot", payload),
   getById: (sessionId: string) => api.get<InterviewSessionResponse>(`/interview/${sessionId}`),
+  getHistory: (params?: { page?: number; limit?: number; status?: string }) =>
+    api.get<{ items: InterviewHistoryItem[]; total: number; page: number; pages: number }>("/interview/history", { params }),
+  getStats: () => api.get<InterviewStats>("/interview/stats"),
 };

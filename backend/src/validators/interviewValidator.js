@@ -26,10 +26,30 @@ const interviewMessagesQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),
 });
 
+const endInterviewSchema = z.object({
+  sessionId: objectId,
+  status: z.enum(["completed", "abandoned"]).default("completed"),
+});
+
+const saveCodeSnapshotSchema = z.object({
+  sessionId: objectId,
+  code: z.string().trim().min(1).max(10000),
+  language: z.enum(["cpp", "python", "javascript", "java", "go", "rust", "typescript"]),
+});
+
+const interviewHistoryQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(50).default(10),
+  status: z.enum(["active", "completed", "abandoned", "all"]).default("all"),
+});
+
 module.exports = {
   startInterviewSchema,
   respondInterviewSchema,
   compareInterviewComplexitySchema,
   interviewSessionParamsSchema,
   interviewMessagesQuerySchema,
+  endInterviewSchema,
+  saveCodeSnapshotSchema,
+  interviewHistoryQuerySchema,
 };
