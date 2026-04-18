@@ -342,12 +342,12 @@ export default function InterviewPage() {
   }, [problem]);
 
   const verdictMeta = useMemo(() => {
-    if (!latestComparison) return { label: "No comparison yet", className: "bg-slate-500/10 text-slate-200 border-slate-500/30" };
+    if (!latestComparison) return { label: "No comparison yet", className: "bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-color)]" };
     const v = latestComparison.comparison.verdict;
-    if (v === "equal") return { label: "Matches Optimal", className: "bg-emerald-500/15 text-emerald-200 border-emerald-400/40" };
-    if (v === "better") return { label: "Better Than Baseline", className: "bg-cyan-500/15 text-cyan-200 border-cyan-400/40" };
-    if (v === "worse") return { label: "Needs Optimization", className: "bg-amber-500/15 text-amber-200 border-amber-400/40" };
-    return { label: "Uncertain", className: "bg-slate-500/10 text-slate-200 border-slate-500/30" };
+    if (v === "equal") return { label: "Matches Optimal", className: "bg-[#dcebdd] text-[#2f6f4e] border-[#98bba3]" };
+    if (v === "better") return { label: "Better Than Baseline", className: "bg-[#e8e0cc] text-[#6d5328] border-[#c4b28f]" };
+    if (v === "worse") return { label: "Needs Optimization", className: "bg-[#f1ddcc] text-[#8c5c26] border-[#d7a97a]" };
+    return { label: "Uncertain", className: "bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-color)]" };
   }, [latestComparison]);
 
   const difficultyColor = problem?.difficulty === "Easy"
@@ -548,21 +548,21 @@ export default function InterviewPage() {
                 </span>
               </div>
               <div className="grid gap-3 md:grid-cols-2">
-                <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/10 p-3">
-                  <p className="text-xs uppercase tracking-wide text-cyan-200/80">Your Complexity</p>
-                  <p className="mt-2 text-sm text-cyan-100">Time: <span className="font-semibold">{latestComparison.userComplexity.time}</span></p>
-                  <p className="text-sm text-cyan-100">Space: <span className="font-semibold">{latestComparison.userComplexity.space}</span></p>
-                  <p className="mt-1 text-xs text-cyan-200/80">Confidence: {Math.round((latestComparison.userComplexity.confidence || 0) * 100)}%</p>
+                <div className="rounded-lg border border-[#c7b79a] bg-[#f7efde] p-3">
+                  <p className="text-xs uppercase tracking-wide text-[#7a6440]">Your Complexity</p>
+                  <p className="mt-2 text-sm text-[var(--text-primary)]">Time: <span className="font-semibold">{latestComparison.userComplexity.time}</span></p>
+                  <p className="text-sm text-[var(--text-primary)]">Space: <span className="font-semibold">{latestComparison.userComplexity.space}</span></p>
+                  <p className="mt-1 text-xs text-[var(--text-secondary)]">Confidence: {Math.round((latestComparison.userComplexity.confidence || 0) * 100)}%</p>
                 </div>
-                <div className="rounded-lg border border-violet-500/20 bg-violet-500/10 p-3">
+                <div className="rounded-lg border border-[#bda7c9] bg-[#f2ebf8] p-3">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs uppercase tracking-wide text-violet-200/80">Optimal Complexity</p>
-                    <span className="rounded-full border border-violet-400/30 bg-violet-500/10 px-2 py-0.5 text-[10px] text-violet-100/90">
+                    <p className="text-xs uppercase tracking-wide text-[#6f5986]">Optimal Complexity</p>
+                    <span className="rounded-full border border-[#bda7c9] bg-[#ebe1f5] px-2 py-0.5 text-[10px] text-[#5f4a73]">
                       {latestComparison.optimalComplexity.source === "problem_data" ? "from problem" : "from AI"}
                     </span>
                   </div>
-                  <p className="mt-2 text-sm text-violet-100">Time: <span className="font-semibold">{latestComparison.optimalComplexity.time}</span></p>
-                  <p className="text-sm text-violet-100">Space: <span className="font-semibold">{latestComparison.optimalComplexity.space}</span></p>
+                  <p className="mt-2 text-sm text-[var(--text-primary)]">Time: <span className="font-semibold">{latestComparison.optimalComplexity.time}</span></p>
+                  <p className="text-sm text-[var(--text-primary)]">Space: <span className="font-semibold">{latestComparison.optimalComplexity.space}</span></p>
                 </div>
               </div>
               {latestComparison.comparison.summary && (

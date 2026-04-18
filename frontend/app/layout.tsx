@@ -1,14 +1,14 @@
 import "./globals.css";
 import Providers from "./providers";
 import Header from "@/src/components/layout/Header";
-import { Manrope, Space_Grotesk } from "next/font/google";
+import { Lora, Playfair_Display } from "next/font/google";
 
-const bodyFont = Manrope({
+const bodyFont = Lora({
   subsets: ["latin"],
   variable: "--font-body",
 });
 
-const headingFont = Space_Grotesk({
+const headingFont = Playfair_Display({
   subsets: ["latin"],
   variable: "--font-heading",
 });

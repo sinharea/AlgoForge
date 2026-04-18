@@ -24,14 +24,14 @@ export default function AuthForm({ mode, onSubmit }: Props) {
   };
 
   return (
-    <form onSubmit={submit} className="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-6">
+    <form onSubmit={submit} className="space-y-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-elevated)] p-6 shadow-[0_10px_24px_rgba(77,57,26,0.1)]">
       {mode === "register" && (
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
           placeholder="Name"
-          className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2"
+          className="input"
         />
       )}
       <input
@@ -40,7 +40,7 @@ export default function AuthForm({ mode, onSubmit }: Props) {
         required
         type="email"
         placeholder="Email"
-        className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2"
+        className="input"
       />
       <input
         value={password}
@@ -49,11 +49,11 @@ export default function AuthForm({ mode, onSubmit }: Props) {
         type="password"
         minLength={8}
         placeholder="Password"
-        className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2"
+        className="input"
       />
       <button
         disabled={loading}
-        className="w-full rounded bg-violet-600 px-4 py-2 font-medium hover:bg-violet-500 disabled:opacity-60"
+        className="btn btn-primary w-full"
       >
         {loading ? "Please wait..." : mode === "login" ? "Login" : "Create account"}
       </button>

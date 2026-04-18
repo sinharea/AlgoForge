@@ -8,6 +8,13 @@ import { CommunityComment } from "@/src/api/communityApi";
 import VoteButtons from "./VoteButtons";
 import CommentBox from "./CommentBox";
 
+const formatRelativeTime = (value?: string) => {
+  if (!value) return "just now";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "just now";
+  return formatDistanceToNow(date, { addSuffix: true });
+};
+
 type CommentThreadProps = {
   comments: CommunityComment[];
   voteLoadingId?: string | null;
@@ -137,7 +144,7 @@ function CommentNodeItem({
               ) : null}
               <span className="inline-flex items-center gap-1 text-[var(--text-muted)]">
                 <Clock className="h-3 w-3" />
-                {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
+                {formatRelativeTime(comment.createdAt)}
               </span>
               {comment.isEdited && (
                 <span className="text-[var(--text-muted)] italic">(edited)</span>
@@ -335,46 +342,6 @@ export default function CommentThread({
           onDelete={onDelete}
           onPin={onPin}
           onAccept={onAccept}
-          onReport={onReport}
-        />
-      ))}
-    </div>
-  );
-}
-              onReport={onReport}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default function CommentThread({
-  comments,
-  voteLoadingId,
-  onReply,
-  onVote,
-  onReport,
-}: CommentThreadProps) {
-  if (!comments.length) {
-    return (
-      <div className="rounded-xl border border-dashed border-[var(--border-color)] p-6 text-center text-sm text-[var(--text-muted)]">
-        No comments yet. Start the conversation.
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      {comments.map((comment) => (
-        <CommentNodeItem
-          key={comment._id}
-          comment={comment}
-          depth={0}
-          voteLoadingId={voteLoadingId}
-          onReply={onReply}
-          onVote={onVote}
           onReport={onReport}
         />
       ))}

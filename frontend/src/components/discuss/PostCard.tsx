@@ -7,6 +7,13 @@ import { clsx } from "clsx";
 import { CommunityPost } from "@/src/api/communityApi";
 import VoteButtons from "./VoteButtons";
 
+const formatRelativeTime = (value?: string) => {
+  if (!value) return "just now";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "just now";
+  return formatDistanceToNow(date, { addSuffix: true });
+};
+
 type PostCardProps = {
   post: CommunityPost;
   problemSlug: string;
@@ -62,7 +69,7 @@ export default function PostCard({ post, problemSlug, voteLoading, onVote, onRep
                 ) : null}
               </span>
               <span className="text-[var(--text-muted)]">·</span>
-              <span>{formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}</span>
+              <span>{formatRelativeTime(post.createdAt)}</span>
               <span className="inline-flex items-center gap-1">
                 <MessageSquare className="h-3 w-3" />
                 {post.commentCount} {post.commentCount === 1 ? "comment" : "comments"}

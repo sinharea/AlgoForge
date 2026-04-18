@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Flag, Loader2, Eye, MessageSquare, Pin, CheckCircle2, Search } from "lucide-react";
+import { ArrowLeft, Flag, Loader2, Eye, MessageSquare, Pin, CheckCircle2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { clsx } from "clsx";
 import toast from "react-hot-toast";
@@ -16,6 +16,13 @@ import ErrorState from "@/src/components/ui/ErrorState";
 import { CardSkeleton } from "@/src/components/ui/Skeleton";
 import useProtectedRoute from "@/src/hooks/useProtectedRoute";
 import { getUser } from "@/src/utils/auth";
+
+const formatRelativeTime = (value?: string) => {
+  if (!value) return "just now";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "just now";
+  return formatDistanceToNow(date, { addSuffix: true });
+};
 
 export default function PostDetailPage() {
   const { ready } = useProtectedRoute();
@@ -177,7 +184,7 @@ export default function PostDetailPage() {
               <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-[var(--text-muted)]">
                 <span className="font-medium text-[var(--text-secondary)]">{post.author?.name || "Unknown"}</span>
                 <span>·</span>
-                <span>{formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}</span>
+                <span>{formatRelativeTime(post.createdAt)}</span>
                 {post.viewCount > 0 && (
                   <span className="inline-flex items-center gap-1">
                     <Eye className="h-3 w-3" /> {post.viewCount} views

@@ -335,15 +335,15 @@ export default function CodePlayground({
 
   return (
     <div className="flex h-full min-w-0 flex-col">
-      <div className="flex flex-col gap-3 rounded-t-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] px-4 py-3 sm:flex-row sm:items-end sm:justify-between">
-        <div className="flex min-w-0 flex-col gap-1">
-          <label className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
+      <div className="grid gap-2 rounded-t-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] px-4 py-3 sm:grid-cols-[170px_minmax(0,1fr)_200px] sm:items-end">
+        <div className="flex min-w-[170px] flex-col gap-0.5">
+          <label className="pl-0.5 text-[10px] font-medium tracking-[0.06em] text-[var(--text-muted)]">
             Language
           </label>
           <select
             value={language}
             onChange={(e) => setLanguage(e.target.value)}
-            className="input select w-full min-w-[150px] leading-5 sm:w-[220px]"
+            className="select h-10 w-full min-w-[150px] rounded-lg border border-[var(--border-color)] bg-[#fffefb] px-3.5 pr-9 text-[15px] leading-none text-[var(--text-primary)] focus:border-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[rgba(138,106,51,0.18)] sm:w-[170px]"
           >
             {languages.map((lang) => (
               <option key={lang.value} value={lang.value}>
@@ -353,70 +353,12 @@ export default function CodePlayground({
           </select>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-          <button
-            onClick={handleReset}
-            className="btn btn-ghost p-2"
-            title="Reset code"
-          >
-            <RotateCcw className="h-4 w-4" />
-          </button>
-          <button
-            onClick={handleAutoIndent}
-            disabled={isAutoIndenting}
-            className="btn btn-ghost whitespace-nowrap px-3 py-2"
-            title="Auto indent code"
-          >
-            {isAutoIndenting ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Indenting...
-              </>
-            ) : (
-              <>
-                <AlignLeft className="h-4 w-4" />
-                Auto Indent
-              </>
-            )}
-          </button>
-          <button
-            onClick={() => setShowTimerPanel((prev) => !prev)}
-            className="btn btn-ghost whitespace-nowrap px-3 py-2"
-            title="Show timer"
-          >
-            <Clock className="h-4 w-4" />
-            Timer
-          </button>
-          <button
-            onClick={() => setShowStopwatchPanel((prev) => !prev)}
-            className="btn btn-ghost whitespace-nowrap px-3 py-2"
-            title="Show stopwatch"
-          >
-            <Play className="h-4 w-4" />
-            Stopwatch
-          </button>
-          <button
-            onClick={onRun}
-            disabled={running || submitting}
-            className="btn btn-secondary whitespace-nowrap"
-          >
-            {running ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Running...
-              </>
-            ) : (
-              <>
-                <Play className="h-4 w-4" />
-                Run
-              </>
-            )}
-          </button>
+        <div className="flex min-w-0 items-center gap-1.5 sm:flex-nowrap sm:justify-start sm:pr-1">
           {onStartInterview ? (
             <button
               onClick={onStartInterview}
               disabled={interviewStarting || submitting || running}
-              className="btn btn-secondary whitespace-nowrap"
+              className="btn btn-secondary shrink-0 whitespace-nowrap px-2.5"
             >
               {interviewStarting ? (
                 <>
@@ -426,46 +368,60 @@ export default function CodePlayground({
               ) : (
                 <>
                   <Mic className="h-4 w-4" />
-                  🎤 Start Interview
+                   Start Interview
                 </>
               )}
             </button>
           ) : null}
+        </div>
+
+        <div className="flex w-full items-center justify-start gap-0.5 sm:justify-end sm:gap-1">
           {onCompareComplexity ? (
             <button
               onClick={onCompareComplexity}
               disabled={comparingComplexity || interviewStarting || submitting || running}
-              className="btn btn-secondary whitespace-nowrap"
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] text-[#505766] transition-colors hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-60"
+              title="Compare complexity"
             >
               {comparingComplexity ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Comparing...
-                </>
+                <Loader2 className="h-[18px] w-[18px] animate-spin" />
               ) : (
-                <>
-                  <Scale className="h-4 w-4" />
-                  Compare
-                </>
+                <Scale className="h-[18px] w-[18px]" />
               )}
             </button>
           ) : null}
           <button
-            onClick={onSubmit}
-            disabled={submitting || running || interviewStarting}
-            className="btn btn-success whitespace-nowrap"
+            id="editor-reset-btn"
+            onClick={handleReset}
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] text-[#505766] transition-colors hover:bg-[var(--bg-tertiary)]"
+            title="Reset code"
           >
-            {submitting ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Submitting...
-              </>
-            ) : (
-              <>
-                <Send className="h-4 w-4" />
-                Submit
-              </>
-            )}
+            <RotateCcw className="h-[18px] w-[18px]" />
+          </button>
+          <button
+            id="editor-autoindent-btn"
+            onClick={handleAutoIndent}
+            disabled={isAutoIndenting}
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] text-[#505766] transition-colors hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-60"
+            title="Auto indent code"
+          >
+            {isAutoIndenting ? <Loader2 className="h-[18px] w-[18px] animate-spin" /> : <AlignLeft className="h-[18px] w-[18px]" />}
+          </button>
+          <button
+            id="editor-timer-btn"
+            onClick={() => setShowTimerPanel((prev) => !prev)}
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] text-[#505766] transition-colors hover:bg-[var(--bg-tertiary)]"
+            title="Show timer"
+          >
+            <Clock className="h-[18px] w-[18px]" />
+          </button>
+          <button
+            id="editor-stopwatch-btn"
+            onClick={() => setShowStopwatchPanel((prev) => !prev)}
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] text-[#505766] transition-colors hover:bg-[var(--bg-tertiary)]"
+            title="Show stopwatch"
+          >
+            <Play className="h-[18px] w-[18px]" />
           </button>
         </div>
       </div>
@@ -582,6 +538,43 @@ export default function CodePlayground({
             quickSuggestions: true,
           }}
         />
+      </div>
+
+      <div className="flex items-center justify-end gap-2 border-x border-b border-[var(--border-color)] bg-[var(--bg-secondary)] px-4 py-3">
+        <button
+          onClick={onRun}
+          disabled={running || submitting}
+          className="btn btn-secondary whitespace-nowrap"
+        >
+          {running ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Running...
+            </>
+          ) : (
+            <>
+              <Play className="h-4 w-4" />
+              Run
+            </>
+          )}
+        </button>
+        <button
+          onClick={onSubmit}
+          disabled={submitting || running || interviewStarting}
+          className="btn btn-success whitespace-nowrap"
+        >
+          {submitting ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Submitting...
+            </>
+          ) : (
+            <>
+              <Send className="h-4 w-4" />
+              Submit
+            </>
+          )}
+        </button>
       </div>
 
       <div className="rounded-b-xl border border-t-0 border-[var(--border-color)] bg-[var(--bg-secondary)]">

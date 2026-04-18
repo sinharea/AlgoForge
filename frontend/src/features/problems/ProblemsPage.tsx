@@ -469,31 +469,31 @@ export default function ProblemsPage() {
   );
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_right,rgba(14,165,233,0.2),transparent_45%),radial-gradient(circle_at_top_left,rgba(45,212,191,0.12),transparent_40%),var(--bg-primary)]">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_right,rgba(183,138,61,0.16),transparent_45%),radial-gradient(circle_at_top_left,rgba(138,106,51,0.10),transparent_40%),var(--bg-primary)]">
       <div className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6">
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="rounded-3xl border border-white/10 bg-gradient-to-r from-cyan-600/20 via-slate-900/60 to-emerald-500/15 p-5 shadow-[0_28px_65px_-40px_rgba(6,182,212,0.95)] backdrop-blur-xl"
+          className="rounded-3xl border border-[var(--border-color)] bg-gradient-to-r from-[#f5ead5] via-[#fdf8ed] to-[#f2e3c6] p-5 shadow-[0_22px_52px_-38px_rgba(92,67,31,0.72)] backdrop-blur-xl"
         >
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-cyan-200/80">AlgoForge Practice Arena</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-muted)]">AlgoForge Practice Arena</p>
               <h1 className="mt-2 text-3xl font-bold tracking-tight">Problems Explorer</h1>
               <p className="mt-2 max-w-2xl text-sm text-[var(--text-secondary)]">
                 Browse, search, and track coding challenges with a LeetCode-style workflow tuned for speed.
               </p>
             </div>
 
-            <div className="flex items-center gap-4 self-start rounded-2xl border border-white/10 bg-[#0b1526]/80 px-4 py-3">
+            <div className="flex items-center gap-4 self-start rounded-2xl border border-[var(--border-color)] bg-[var(--bg-elevated)] px-4 py-3">
               <div className="relative h-20 w-20">
                 <svg className="h-20 w-20 -rotate-90" viewBox="0 0 100 100" aria-hidden>
-                  <circle cx="50" cy="50" r={progressRadius} stroke="rgba(148,163,184,0.2)" strokeWidth="8" fill="none" />
+                  <circle cx="50" cy="50" r={progressRadius} stroke="rgba(106,111,122,0.25)" strokeWidth="8" fill="none" />
                   <circle
                     cx="50"
                     cy="50"
                     r={progressRadius}
-                    stroke="rgb(34 211 238)"
+                    stroke="rgb(143 111 59)"
                     strokeWidth="8"
                     fill="none"
                     strokeLinecap="round"
@@ -509,7 +509,7 @@ export default function ProblemsPage() {
 
               <div>
                 <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Progress</p>
-                <p className="text-xl font-semibold text-emerald-200">
+                <p className="text-xl font-semibold text-[var(--success)]">
                   {solvedCount} / {totalCount}
                 </p>
                 <p className="text-xs text-[var(--text-secondary)]">Solved problems</p>
@@ -530,8 +530,8 @@ export default function ProblemsPage() {
                 onClick={() => setCategory(tab)}
                 className={
                   active
-                    ? "inline-flex items-center gap-2 rounded-full border border-cyan-300/60 bg-cyan-400/20 px-3 py-1.5 text-sm text-cyan-100"
-                    : "inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-[var(--text-secondary)] transition hover:border-white/25 hover:text-[var(--text-primary)]"
+                    ? "inline-flex items-center gap-2 rounded-full border border-[var(--border-hover)] bg-[#e8d7b7] px-3 py-1.5 text-sm text-[var(--accent-muted)]"
+                    : "inline-flex items-center gap-2 rounded-full border border-[var(--border-color)] bg-[var(--bg-elevated)] px-3 py-1.5 text-sm text-[var(--text-secondary)] transition hover:border-[var(--border-hover)] hover:text-[var(--text-primary)]"
                 }
               >
                 <Icon className="h-3.5 w-3.5" />
@@ -542,7 +542,7 @@ export default function ProblemsPage() {
         </div>
 
         {problemsQuery.isError && (
-          <div className="mt-4 rounded-xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm text-amber-100">
+          <div className="mt-4 rounded-xl border border-[#b98943]/35 bg-[#f6e9cf] px-4 py-3 text-sm text-[#7d5320]">
             <div className="flex items-start gap-2">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>Live problem API is unavailable. Problem list and company trends may be incomplete.</span>

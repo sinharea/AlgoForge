@@ -13,6 +13,8 @@ const MAX_DEPTH = 5;
 const normalizeTags = (tags = []) =>
   [...new Set(tags.map((tag) => String(tag).trim().toLowerCase()).filter(Boolean))];
 
+const escapeRegex = (value = "") => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 const extractMentions = (content) => {
   const matches = content.match(/@(\w+)/g);
   if (!matches) return [];
@@ -152,8 +154,14 @@ const listPosts = async ({ problemId, page = 1, limit = DEFAULT_POST_LIMIT, sort
   }
 
   const filter = { problemId, isDeleted: { $ne: true } };
-  if (search && search.trim()) {
-    filter.$text = { $search: search.trim() };
+  const searchTerm = typeof search === "string" ? search.trim() : "";
+  if (searchTerm) {
+    const regex = new RegExp(escapeRegex(searchTerm), "i");
+    filter.$or = [
+      { title: regex },
+      { content: regex },
+      { tags: regex },
+    ];
   }
 
   const [posts, total] = await Promise.all([
@@ -216,8 +224,12 @@ const getPostById = async ({ postId, commentsLimit = DEFAULT_COMMENTS_LIMIT, com
   if (!post) throw ApiError.notFound("Post not found");
   if (post.isDeleted) throw ApiError.notFound("Post has been deleted");
 
-  // Increment view count
-  Post.updateOne({ _id: postId }, { $inc: { viewCount: 1 } }).exec();
+  // Increment view count (non-critical; never crash request flow)
+  try {
+    await Post.updateOne({ _id: postId }, { $inc: { viewCount: 1 } }).exec();
+  } catch {
+    // Ignore view-count update failures for read endpoint stability.
+  }
 
   const safeCommentsLimit = Math.min(500, Math.max(1, Number(commentsLimit) || DEFAULT_COMMENTS_LIMIT));
 

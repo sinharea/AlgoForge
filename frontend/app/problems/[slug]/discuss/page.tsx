@@ -216,13 +216,15 @@ export default function ProblemDiscussPage() {
 
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+          <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-[var(--bg-tertiary)] p-1">
+            <Search className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+          </div>
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search discussions..."
-            className="input w-full pl-9"
+            className="input !h-10 w-full !pl-[4.25rem] !pr-3"
           />
         </div>
         <div className="flex items-center gap-2">

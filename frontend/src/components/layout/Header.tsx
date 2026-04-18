@@ -23,7 +23,7 @@ const baseNavItems = [
   { href: "/problems", label: "Problems", icon: Code2 },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/contests", label: "Contests", icon: Trophy },
-  { href: "/weakness", label: "🧠 Weakness Report", icon: Brain },
+  { href: "/weakness", label: "Weakness Report", icon: Brain },
 ];
 
 export default function Header() {
@@ -52,7 +52,7 @@ export default function Header() {
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
         <div className="flex items-center gap-4 lg:gap-8">
           <Link href="/" className="flex items-center gap-2 text-xl font-bold">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-purple-600">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#8f6f3b] to-[#6f552c]">
               <Code2 className="h-5 w-5 text-white" />
             </div>
             <span className="hidden gradient-text sm:inline">AlgoForge</span>
@@ -93,7 +93,7 @@ export default function Header() {
             <div ref={dropdownRef} className="relative hidden md:block">
               <button
                 onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="flex items-center gap-2 rounded-lg bg-[var(--bg-tertiary)] px-3 py-2 text-sm font-medium transition-colors hover:bg-[var(--bg-elevated)]"
+                className="flex items-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-elevated)] px-3 py-2 text-sm font-medium transition-colors hover:border-[var(--border-hover)]"
               >
                 {user?.avatarUrl ? (
                   <img
@@ -102,7 +102,7 @@ export default function Header() {
                     className="h-7 w-7 rounded-full object-cover"
                   />
                 ) : (
-                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-purple-600 text-xs font-semibold text-white">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-[#8f6f3b] to-[#6f552c] text-xs font-semibold text-white">
                     {user?.name?.charAt(0).toUpperCase()}
                   </div>
                 )}
@@ -111,7 +111,7 @@ export default function Header() {
               </button>
 
               {dropdownOpen && (
-                <div className="absolute right-0 mt-2 w-56 animate-fade-in rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-2 shadow-xl">
+                <div className="absolute right-0 mt-2 w-56 animate-fade-in rounded-xl border border-[var(--border-color)] bg-[var(--bg-elevated)] p-2 shadow-xl">
                   <div className="border-b border-[var(--border-color)] px-3 py-2 mb-2">
                     <p className="text-sm font-medium">{user?.name}</p>
                     <p className="text-xs text-[var(--text-muted)]">{user?.email}</p>
@@ -206,7 +206,7 @@ export default function Header() {
                         className="h-10 w-10 rounded-full object-cover"
                       />
                     ) : (
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-purple-600 font-semibold text-white">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[#8f6f3b] to-[#6f552c] font-semibold text-white">
                         {user?.name?.charAt(0).toUpperCase()}
                       </div>
                     )}
