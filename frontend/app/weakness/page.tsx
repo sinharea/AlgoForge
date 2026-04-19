@@ -315,8 +315,8 @@ export default function WeaknessPage() {
           )}
 
           <section className="mt-6 rounded-2xl border border-cyan-500/25 bg-cyan-500/10 p-5">
-            <h2 className="text-lg font-semibold text-cyan-200">Strategy</h2>
-            <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-cyan-100/90">
+            <h2 className="text-lg font-semibold text-[var(--text-primary)]">Strategy</h2>
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-[var(--text-secondary)]">
               {report?.strategy || "Keep solving problems and return here for a personalized strategy."}
             </p>
           </section>

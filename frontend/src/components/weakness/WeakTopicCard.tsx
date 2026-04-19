@@ -5,7 +5,12 @@ type WeakTopicCardProps = {
   type?: "weak" | "strong";
 };
 
-const toPercent = (value: number) => Number((value * 100).toFixed(1));
+const toPercent = (value: number) => {
+  const numeric = Number(value || 0);
+  if (!Number.isFinite(numeric)) return 0;
+  const normalized = numeric >= 0 && numeric <= 1 ? numeric * 100 : numeric;
+  return Number(normalized.toFixed(1));
+};
 
 export default function WeakTopicCard({ topic, accuracy, attempts, type = "weak" }: WeakTopicCardProps) {
   const accuracyPercent = toPercent(accuracy || 0);
