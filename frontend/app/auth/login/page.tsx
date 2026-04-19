@@ -67,7 +67,7 @@ export default function LoginPage() {
                   setEmail(e.target.value);
                   if (errors.email) setErrors({ ...errors, email: undefined });
                 }}
-                className={`input pl-10 ${errors.email ? "border-[var(--error)]" : ""}`}
+                className={`input input-with-leading-icon ${errors.email ? "border-[var(--error)]" : ""}`}
                 placeholder="you@example.com"
               />
             </div>
@@ -90,7 +90,7 @@ export default function LoginPage() {
                   setPassword(e.target.value);
                   if (errors.password) setErrors({ ...errors, password: undefined });
                 }}
-                className={`input pl-10 pr-10 ${errors.password ? "border-[var(--error)]" : ""}`}
+                className={`input input-with-leading-icon input-with-trailing-icon ${errors.password ? "border-[var(--error)]" : ""}`}
                 placeholder="Enter your password"
               />
               <button

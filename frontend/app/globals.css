@@ -148,14 +148,27 @@ h1, h2, h3, h4, h5 {
 }
 
 .input {
+  --input-padding-left: 1rem;
+  --input-padding-right: 1rem;
   width: 100%;
-  padding: 0.75rem 1rem;
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+  padding-left: var(--input-padding-left);
+  padding-right: var(--input-padding-right);
   background: #fffefb;
   border: 1px solid var(--border-color);
   border-radius: 0.5rem;
   color: var(--text-primary);
   font-size: 0.875rem;
   transition: all 0.2s ease;
+}
+
+.input-with-leading-icon {
+  --input-padding-left: 2.5rem;
+}
+
+.input-with-trailing-icon {
+  --input-padding-right: 2.5rem;
 }
 
 .input:hover {

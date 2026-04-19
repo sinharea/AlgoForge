@@ -63,12 +63,6 @@ const FALLBACK_COMPANIES = [
   "Uber",
 ] as const;
 
-const DIFFICULTY_BASE_ACCEPTANCE: Record<Difficulty, number> = {
-  Easy: 67,
-  Medium: 50,
-  Hard: 34,
-};
-
 const CATEGORY_TAG_MAP: Record<Exclude<ProblemCategory, "All Topics">, string[]> = {
   Algorithms: [
     "Array",
@@ -318,13 +312,6 @@ const inferCompanies = (topics: string[], identity: string): string[] => {
   return Array.from(companies).slice(0, 4);
 };
 
-const inferAcceptance = (difficulty: Difficulty, identity: string): number => {
-  const base = DIFFICULTY_BASE_ACCEPTANCE[difficulty];
-  const variance = (stableHash(identity) % 180) / 10 - 9;
-  const result = Math.min(88.9, Math.max(18.4, base + variance));
-  return Number(result.toFixed(1));
-};
-
 const inferPremium = (identity: string): boolean => stableHash(identity) % 5 === 0;
 
 const buildKeywords = (title: string, topics: string[], companies: string[]): string[] => {
@@ -368,10 +355,10 @@ const toProblemRecordFromApi = (problem: ApiProblem): ProblemRecord => {
   const topics = (problem.tags || []).map(normalizeTopic);
   const companies = inferCompanies(topics, identity);
 
-  // Use real acceptance rate from ProblemStats if available
-  const acceptance = problem.acceptanceRate != null && problem.acceptanceRate > 0
+  // Use API acceptance rate when provided; default missing values to 0.
+  const acceptance = typeof problem.acceptanceRate === "number" && Number.isFinite(problem.acceptanceRate)
     ? Number(problem.acceptanceRate.toFixed(1))
-    : inferAcceptance(problem.difficulty, identity);
+    : 0;
 
   return {
     id: problem._id,

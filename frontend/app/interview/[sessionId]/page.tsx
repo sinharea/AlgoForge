@@ -119,16 +119,16 @@ function ScoreRing({ score, size = 80 }: { score: number; size?: number }) {
 
 function ScoreBreakdown({ scoring }: { scoring: InterviewScoring }) {
   const items = [
-    { label: "Correctness", value: scoring.correctness, max: 30 },
+    { label: "Correctness", value: scoring.correctness, max: 25 },
     { label: "Optimality", value: scoring.optimality, max: 25 },
     { label: "Communication", value: scoring.communication, max: 20 },
     { label: "Edge Cases", value: scoring.edgeCases, max: 15 },
-    { label: "Code Quality", value: scoring.codeQuality, max: 10 },
+    { label: "Code Quality", value: scoring.codeQuality, max: 15 },
   ];
   return (
     <div className="space-y-2">
       {items.map(({ label, value, max }) => {
-        const pct = max > 0 ? (value / max) * 100 : 0;
+        const pct = max > 0 ? Math.max(0, Math.min((value / max) * 100, 100)) : 0;
         return (
           <div key={label}>
             <div className="flex items-center justify-between text-xs">
