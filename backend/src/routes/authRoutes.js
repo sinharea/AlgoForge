@@ -9,6 +9,7 @@ const {
   resetPassword,
   verifyEmail,
   me,
+  getAvatar,
   updateMe,
 } = require("../controllers/authController");
 const { startOAuth, finishOAuth } = require("../controllers/oauthController");
@@ -36,6 +37,7 @@ router.post("/logout", auth, logout);
 router.post("/forgot-password", loginLimiter, validate(forgotPasswordSchema), forgotPassword); // Extra strict for password reset
 router.post("/reset-password", validate(resetPasswordSchema), resetPassword);
 router.post("/verify-email", validate(verifyEmailSchema), verifyEmail);
+router.get("/avatar/:userId", getAvatar);
 router.get("/me", auth, me);
 router.patch("/me", auth, uploadAvatar.single("avatar"), validate(updateProfileSchema), updateMe);
 

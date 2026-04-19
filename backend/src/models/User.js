@@ -50,6 +50,14 @@ const userSchema = new mongoose.Schema({
     trim: true,
     default: "",
   },
+  avatarData: {
+    type: Buffer,
+    select: false,
+  },
+  avatarMimeType: {
+    type: String,
+    select: false,
+  },
   refreshTokenHash: {
     type: String,
     select: false,

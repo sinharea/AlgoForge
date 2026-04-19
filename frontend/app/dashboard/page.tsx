@@ -210,6 +210,14 @@ export default function DashboardPage() {
     [data.byTopic]
   );
 
+  const topicProgressData = useMemo(() => {
+    const totalSolved = Math.max(data.totalSolved, 1);
+    return topicData.map((topic) => ({
+      ...topic,
+      percent: Math.min(100, Math.round((topic.solved / totalSolved) * 100)),
+    }));
+  }, [data.totalSolved, topicData]);
+
   if (loading) {
     return (
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
@@ -221,28 +229,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="relative overflow-hidden rounded-3xl border border-[var(--border-color)] bg-gradient-to-r from-[#f5ead5] via-[#fdf8ed] to-[#f2e3c6] p-6 shadow-[0_18px_60px_-30px_rgba(92,67,31,0.72)]"
-        >
-          <div className="pointer-events-none absolute -right-24 -top-16 h-48 w-48 rounded-full bg-[#cfa968]/25 blur-3xl" />
-          <div className="pointer-events-none absolute -left-20 -bottom-20 h-56 w-56 rounded-full bg-[#b98b44]/20 blur-3xl" />
-
-          <div className="relative flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <p className="text-sm text-[var(--text-muted)]">Welcome back</p>
-              <h1 className="mt-1 text-3xl font-semibold tracking-tight md:text-4xl">
-                {data.userName}&apos;s Engineering Dashboard
-              </h1>
-              <p className="mt-2 max-w-2xl text-sm md:text-base text-[var(--text-secondary)]">
-                Your performance command center across problems, patterns, momentum, and contest readiness.
-              </p>
-            </div>
-          </div>
-        </motion.div>
-
-        <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
             title="Problems Solved"
             value={data.totalSolved}
@@ -352,6 +339,30 @@ export default function DashboardPage() {
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
+            </div>
+
+            <div className="mt-4 border-t border-[var(--border-color)] pt-4">
+              <h4 className="mb-3 text-sm font-semibold text-[var(--text-primary)]">Topicwise Progress</h4>
+              {topicProgressData.length === 0 ? (
+                <p className="text-xs text-[var(--text-secondary)]">No topic progress available yet.</p>
+              ) : (
+                <div className="space-y-2.5">
+                  {topicProgressData.map((topic) => (
+                    <div key={`progress-${topic.name}`}>
+                      <div className="mb-1 flex items-center justify-between text-xs text-[var(--text-secondary)]">
+                        <span className="truncate pr-2">{topic.name}</span>
+                        <span>{topic.solved} solved ({topic.percent}%)</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-[var(--border-color)]">
+                        <div
+                          className="h-2 rounded-full bg-gradient-to-r from-[#c59a56] to-[#8f6f3b]"
+                          style={{ width: `${topic.percent}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </ChartCard>
         </section>

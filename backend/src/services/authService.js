@@ -184,7 +184,31 @@ const getMyProfile = async ({ userId }) => {
   return sanitizeUser(user);
 };
 
-const updateMyProfile = async ({ userId, name, avatarUrl, currentPassword, newPassword, bio, socialLinks, preferredLanguage }) => {
+const getUserAvatar = async ({ userId }) => {
+  const user = await User.findById(userId).select("+avatarData +avatarMimeType");
+  if (!user) throw new ApiError(404, "User not found");
+
+  if (!user.avatarData || !user.avatarMimeType) {
+    throw new ApiError(404, "Avatar not found");
+  }
+
+  return {
+    data: user.avatarData,
+    mimeType: user.avatarMimeType,
+  };
+};
+
+const updateMyProfile = async ({
+  userId,
+  name,
+  avatarUrl,
+  avatarUpload,
+  currentPassword,
+  newPassword,
+  bio,
+  socialLinks,
+  preferredLanguage,
+}) => {
   const user = await User.findById(userId).select("+password");
   if (!user) throw new ApiError(404, "User not found");
 
@@ -192,8 +216,16 @@ const updateMyProfile = async ({ userId, name, avatarUrl, currentPassword, newPa
     user.name = name.trim();
   }
 
-  if (typeof avatarUrl === "string") {
+  if (avatarUpload?.buffer && avatarUpload?.mimetype) {
+    user.avatarData = avatarUpload.buffer;
+    user.avatarMimeType = avatarUpload.mimetype;
+    if (typeof avatarUrl === "string") {
+      user.avatarUrl = avatarUrl.trim();
+    }
+  } else if (typeof avatarUrl === "string") {
     user.avatarUrl = avatarUrl.trim();
+    user.avatarData = undefined;
+    user.avatarMimeType = undefined;
   }
 
   if (typeof bio === "string") {
@@ -247,5 +279,6 @@ module.exports = {
   verifyEmail,
   upsertOAuthUser,
   getMyProfile,
+  getUserAvatar,
   updateMyProfile,
 };

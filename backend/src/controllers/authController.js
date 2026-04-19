@@ -8,6 +8,7 @@ const {
   resetPassword,
   verifyEmail,
   getMyProfile,
+  getUserAvatar,
   updateMyProfile,
 } = require("../services/authService");
 
@@ -51,14 +52,26 @@ const me = asyncHandler(async (req, res) => {
   res.json({ user });
 });
 
+const getAvatar = asyncHandler(async (req, res) => {
+  const avatar = await getUserAvatar({ userId: req.params.userId });
+  res.setHeader("Content-Type", avatar.mimeType);
+  res.setHeader("Cache-Control", "public, max-age=86400");
+  res.send(avatar.data);
+});
+
 const updateMe = asyncHandler(async (req, res) => {
+  const uploadedAvatar = req.file
+    ? { buffer: req.file.buffer, mimetype: req.file.mimetype }
+    : undefined;
+
   const uploadedAvatarUrl = req.file
-    ? `${req.protocol}://${req.get("host")}/uploads/avatars/${req.file.filename}`
+    ? `${req.protocol}://${req.get("host")}/api/auth/avatar/${req.user._id}?v=${Date.now()}`
     : undefined;
 
   const user = await updateMyProfile({
     userId: req.user._id,
     ...req.body,
+    ...(uploadedAvatar ? { avatarUpload: uploadedAvatar } : {}),
     ...(uploadedAvatarUrl ? { avatarUrl: uploadedAvatarUrl } : {}),
   });
   res.json({ user });
@@ -73,5 +86,6 @@ module.exports = {
   resetPassword: resetPasswordHandler,
   verifyEmail: verifyEmailHandler,
   me,
+  getAvatar,
   updateMe,
 };
