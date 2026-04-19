@@ -1,7 +1,0 @@
-i have to build a full working coding platfrom
-so design a perfect industry level schemas
-like for problem it should store all details specific to problem but property like total submission, acceptance etc make unnecessary use of this schema so can make diff table for these
-do same for all schema like keep it scalable
-
-schemas are very important as i have to implement user specific suggesion using ml model,
-show analytic using graph per topic , so store per user submission history 

@@ -1,7 +1,6 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Database, Layers, Shell, Sparkles, SplitSquareHorizontal } from "lucide-react";
 import ErrorState from "@/src/components/ui/ErrorState";
@@ -469,56 +468,9 @@ export default function ProblemsPage() {
   );
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_right,rgba(183,138,61,0.16),transparent_45%),radial-gradient(circle_at_top_left,rgba(138,106,51,0.10),transparent_40%),var(--bg-primary)]">
+    <div className="min-h-screen bg-[var(--bg-primary)]">
       <div className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6">
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="rounded-3xl border border-[var(--border-color)] bg-gradient-to-r from-[#f5ead5] via-[#fdf8ed] to-[#f2e3c6] p-5 shadow-[0_22px_52px_-38px_rgba(92,67,31,0.72)] backdrop-blur-xl"
-        >
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-muted)]">AlgoForge Practice Arena</p>
-              <h1 className="mt-2 text-3xl font-bold tracking-tight">Problems Explorer</h1>
-              <p className="mt-2 max-w-2xl text-sm text-[var(--text-secondary)]">
-                Browse, search, and track coding challenges with a LeetCode-style workflow tuned for speed.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-4 self-start rounded-2xl border border-[var(--border-color)] bg-[var(--bg-elevated)] px-4 py-3">
-              <div className="relative h-20 w-20">
-                <svg className="h-20 w-20 -rotate-90" viewBox="0 0 100 100" aria-hidden>
-                  <circle cx="50" cy="50" r={progressRadius} stroke="rgba(106,111,122,0.25)" strokeWidth="8" fill="none" />
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r={progressRadius}
-                    stroke="rgb(143 111 59)"
-                    strokeWidth="8"
-                    fill="none"
-                    strokeLinecap="round"
-                    strokeDasharray={circumference}
-                    strokeDashoffset={progressOffset}
-                    className="transition-all duration-500"
-                  />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center text-sm font-semibold">
-                  {progressPercent}%
-                </div>
-              </div>
-
-              <div>
-                <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Progress</p>
-                <p className="text-xl font-semibold text-[var(--success)]">
-                  {solvedCount} / {totalCount}
-                </p>
-                <p className="text-xs text-[var(--text-secondary)]">Solved problems</p>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-
-        <div className="mt-6 flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2">
           {CATEGORY_TABS.map((tab) => {
             const active = category === tab;
             const Icon = getStatusIcon(tab);
@@ -577,9 +529,9 @@ export default function ProblemsPage() {
             {showLoading && <ProblemListSkeleton />}
 
             {!showLoading && filteredProblems.length === 0 && (
-              <div className="rounded-2xl border border-white/10 bg-white/5 px-6 py-12 text-center backdrop-blur-xl">
-                <div className="mx-auto mb-3 inline-flex rounded-full border border-white/10 bg-[var(--bg-secondary)]/80 p-3">
-                  <Sparkles className="h-5 w-5 text-cyan-200" />
+              <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-elevated)] px-6 py-12 text-center">
+                <div className="mx-auto mb-3 inline-flex rounded-full border border-[var(--border-color)] bg-[var(--bg-secondary)] p-3">
+                  <Sparkles className="h-5 w-5 text-[#b07f2f]" />
                 </div>
                 <h3 className="text-lg font-semibold">No problems match your filters</h3>
                 <p className="mt-2 text-sm text-[var(--text-secondary)]">
@@ -601,12 +553,49 @@ export default function ProblemsPage() {
             )}
           </div>
 
-          <div className="h-fit xl:sticky xl:top-24">
+          <div className="space-y-4 h-fit xl:sticky xl:top-24">
             <CompanySidebar
               companies={trendingSidebarCompanies}
               activeCompanies={filters.company}
               onToggleCompany={handleToggleCompany}
             />
+
+            <aside className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-elevated)] p-4 shadow-[0_22px_48px_-36px_rgba(92,67,31,0.72)]">
+              <div className="mb-2 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">Progress</h3>
+                <span className="text-xs text-[var(--text-muted)]">Solved</span>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <div className="relative h-20 w-20">
+                  <svg className="h-20 w-20 -rotate-90" viewBox="0 0 100 100" aria-hidden>
+                    <circle cx="50" cy="50" r={progressRadius} stroke="rgba(106,111,122,0.25)" strokeWidth="8" fill="none" />
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r={progressRadius}
+                      stroke="rgb(143 111 59)"
+                      strokeWidth="8"
+                      fill="none"
+                      strokeLinecap="round"
+                      strokeDasharray={circumference}
+                      strokeDashoffset={progressOffset}
+                      className="transition-all duration-500"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center text-sm font-semibold text-[var(--text-primary)]">
+                    {progressPercent}%
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xl font-semibold text-[var(--success)]">
+                    {solvedCount} / {totalCount}
+                  </p>
+                  <p className="text-xs text-[var(--text-secondary)]">Solved problems</p>
+                </div>
+              </div>
+            </aside>
           </div>
         </div>
       </div>

@@ -12,7 +12,7 @@ type Props = {
 
 export default function TagBar({ topics, activeTopics, onToggleTopic }: Props) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur-xl">
+    <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-elevated)] p-3">
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
           <Hash className="h-4 w-4" />
@@ -35,8 +35,8 @@ export default function TagBar({ topics, activeTopics, onToggleTopic }: Props) {
                 className={clsx(
                   "rounded-full border px-3 py-1.5 text-sm transition",
                   isActive
-                    ? "border-cyan-300/70 bg-cyan-400/20 text-cyan-100"
-                    : "border-white/10 bg-[var(--bg-secondary)]/70 text-[var(--text-secondary)] hover:border-white/25 hover:text-[var(--text-primary)]"
+                    ? "border-[#b89457]/60 bg-[#f1e4cb] text-[#7a5b2b]"
+                    : "border-[var(--border-color)] bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:border-[var(--border-hover)] hover:text-[var(--text-primary)]"
                 )}
               >
                 {topic}

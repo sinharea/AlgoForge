@@ -33,13 +33,13 @@ export default function ChatBubble({ role, content, timestamp }: ChatBubbleProps
         className={clsx(
           "max-w-[85%] rounded-2xl border px-4 py-3 text-sm leading-relaxed md:max-w-[75%]",
           isUser
-            ? "rounded-tr-sm border-cyan-500/20 bg-cyan-500/10 text-cyan-50"
+            ? "rounded-tr-sm border-[#66b3d6]/50 bg-[#e8f7ff] text-[#12374a]"
             : "rounded-tl-sm border-[var(--border-color)] bg-[var(--bg-tertiary)] text-[var(--text-primary)]"
         )}
       >
         <p className="whitespace-pre-wrap">{content}</p>
         {timestamp && (
-          <p className={clsx("mt-1.5 text-[10px]", isUser ? "text-right text-cyan-300/50" : "text-left text-[var(--text-muted)]")}>
+          <p className={clsx("mt-1.5 text-[10px]", isUser ? "text-right text-[#2d6a88]/70" : "text-left text-[var(--text-muted)]")}>
             {formatTime(timestamp)}
           </p>
         )}

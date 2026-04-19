@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import toast from "react-hot-toast";
 import { clsx } from "clsx";
-import { Clock, Tag, Copy, Check, BookOpen, FileCode, TestTube, CheckCircle2, XCircle, AlertTriangle, Loader2, ShieldCheck, Hash, Scale, Lightbulb, GraduationCap, Sparkles } from "lucide-react";
+import { Clock, Tag, Copy, Check, BookOpen, FileCode, TestTube, CheckCircle2, XCircle, AlertTriangle, Loader2, ShieldCheck, Hash, Scale, Lightbulb, GraduationCap, Sparkles, X } from "lucide-react";
 import { problemApi, RunResult } from "@/src/api/problemApi";
 import { interviewApi, InterviewComplexityComparison } from "@/src/api/interviewApi";
 import CodePlayground from "@/src/features/editor/CodePlayground";
@@ -117,6 +117,7 @@ export default function ProblemDetailPage() {
   const [languageInitialized, setLanguageInitialized] = useState(false);
   const [latestComplexityComparison, setLatestComplexityComparison] = useState<InterviewComplexityComparison | null>(null);
   const [activeInterviewSessionId, setActiveInterviewSessionId] = useState<string | null>(null);
+  const [isComparisonModalOpen, setIsComparisonModalOpen] = useState(false);
   const [revealedHintLevel, setRevealedHintLevel] = useState(0);
   const pageLoadedAt = useRef(Date.now());
 
@@ -233,7 +234,24 @@ export default function ProblemDetailPage() {
         throw new Error("Problem not ready yet");
       }
 
-      return (await interviewApi.start({ problemId: problemQuery.data._id })).data;
+      const startResponse = await interviewApi.start({ problemId: problemQuery.data._id });
+      const sessionData = startResponse.data;
+
+      const normalizedCode = String(code || "").trim();
+      if (normalizedCode) {
+        // Best-effort snapshot so interviewer context can use current editor solution.
+        try {
+          await interviewApi.saveCode({
+            sessionId: sessionData.sessionId,
+            code: normalizedCode,
+            language,
+          });
+        } catch {
+          // Ignore snapshot save failures; interview start should still succeed.
+        }
+      }
+
+      return sessionData;
     },
     onSuccess: (data) => {
       setActiveInterviewSessionId(data.sessionId);
@@ -270,7 +288,13 @@ export default function ProblemDetailPage() {
       setActiveInterviewSessionId(data.sessionId);
       const nextComparison = data.latestComplexityComparison || data.comparison || null;
       setLatestComplexityComparison(nextComparison);
-      toast.success("Complexity comparison ready. Continue follow-up in interview chat.");
+
+      if (nextComparison) {
+        setIsComparisonModalOpen(true);
+        toast.success("Complexity comparison ready.");
+      } else {
+        toast.error("Comparison result is empty. Please try again.");
+      }
     },
     onError: (error: any) => {
       const errorMsg =
@@ -433,6 +457,19 @@ export default function ProblemDetailPage() {
   useEffect(() => {
     setCopiedSubmissionCode(false);
   }, [selectedSubmissionId]);
+
+  useEffect(() => {
+    if (!isComparisonModalOpen) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsComparisonModalOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isComparisonModalOpen]);
 
   if (problemQuery.isLoading) return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
@@ -1071,17 +1108,64 @@ export default function ProblemDetailPage() {
             customInput={customInput}
             setCustomInput={setCustomInput}
           />
+        </div>
+      </div>
 
-          {latestComplexityComparison && comparisonVerdictMeta ? (
-            <div className="mt-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-4">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <h2 className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
-                  <Scale className="h-4 w-4 text-[var(--accent-secondary)]" />
+      {isComparisonModalOpen && latestComplexityComparison && comparisonVerdictMeta ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4"
+          onClick={() => setIsComparisonModalOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Complexity comparison"
+            className="w-full max-w-3xl overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-[0_30px_60px_rgba(0,0,0,0.45)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-[var(--border-color)] p-5">
+              <div>
+                <h2 className="flex items-center gap-2 text-lg font-semibold text-[var(--text-primary)]">
+                  <Scale className="h-5 w-5 text-[var(--accent-secondary)]" />
                   Complexity Comparison
                 </h2>
+                <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                  Your current solution vs estimated optimal complexity.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsComparisonModalOpen(false)}
+                className="btn btn-ghost h-9 w-9 rounded-full p-0"
+                aria-label="Close comparison modal"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="max-h-[78vh] space-y-4 overflow-y-auto p-5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className={`rounded-full border px-3 py-1 text-xs font-medium ${comparisonVerdictMeta.className}`}>
                   {comparisonVerdictMeta.label}
                 </span>
+                <button
+                  type="button"
+                  onClick={() => compareComplexityMutation.mutate()}
+                  disabled={compareComplexityMutation.isPending}
+                  className="btn btn-secondary"
+                >
+                  {compareComplexityMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Comparing...
+                    </>
+                  ) : (
+                    <>
+                      <Scale className="h-4 w-4" />
+                      Compare Again
+                    </>
+                  )}
+                </button>
               </div>
 
               <div className="grid gap-3 md:grid-cols-2">
@@ -1116,26 +1200,33 @@ export default function ProblemDetailPage() {
                 </div>
               </div>
 
-              <p className="mt-3 text-sm text-[var(--text-secondary)]">
+              <p className="text-sm text-[var(--text-secondary)]">
                 {latestComplexityComparison.comparison.summary || "No summary available."}
               </p>
               {latestComplexityComparison.comparison.recommendation ? (
-                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                <p className="text-xs text-[var(--text-muted)]">
                   Recommendation: {latestComplexityComparison.comparison.recommendation}
                 </p>
               ) : null}
 
-              {activeInterviewSessionId ? (
-                <div className="mt-3">
+              <div className="flex flex-wrap items-center justify-end gap-2 border-t border-[var(--border-color)] pt-3">
+                <button
+                  type="button"
+                  onClick={() => setIsComparisonModalOpen(false)}
+                  className="btn btn-ghost"
+                >
+                  Close
+                </button>
+                {activeInterviewSessionId ? (
                   <Link href={`/interview/${activeInterviewSessionId}`} className="btn btn-secondary">
                     Continue in Interview Prompt Box
                   </Link>
-                </div>
-              ) : null}
+                ) : null}
+              </div>
             </div>
-          ) : null}
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }

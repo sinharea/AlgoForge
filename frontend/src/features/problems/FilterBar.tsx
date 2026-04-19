@@ -55,7 +55,7 @@ export default function FilterBar({
   return (
     <motion.section
       layout
-      className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-[0_22px_50px_-35px_rgba(14,116,144,1)] backdrop-blur-xl"
+      className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-elevated)] p-4 shadow-[0_22px_50px_-35px_rgba(92,67,31,0.72)]"
     >
       <div className="grid gap-3 md:grid-cols-[1.5fr_auto_auto]">
         <div className="relative">
@@ -87,8 +87,8 @@ export default function FilterBar({
           className={clsx(
             "inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition",
             filters.showFavorites
-              ? "border-amber-300/60 bg-amber-300/15 text-amber-200"
-              : "border-white/15 bg-[var(--bg-secondary)]/80 text-[var(--text-secondary)] hover:border-white/30 hover:text-[var(--text-primary)]"
+              ? "border-[#b89457]/60 bg-[#f0e0c4] text-[#7a5b2b]"
+              : "border-[var(--border-color)] bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:border-[var(--border-hover)] hover:text-[var(--text-primary)]"
           )}
         >
           <Star className={clsx("h-4 w-4", filters.showFavorites && "fill-current")} />
@@ -110,8 +110,8 @@ export default function FilterBar({
                   className={clsx(
                     "rounded-full border px-3 py-1.5 text-sm transition",
                     active
-                      ? "border-cyan-300/60 bg-cyan-400/20 text-cyan-100"
-                      : "border-white/10 bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:border-white/25 hover:text-[var(--text-primary)]"
+                      ? "border-[#b89457]/60 bg-[#f0e0c4] text-[#7d5e2a]"
+                      : "border-[var(--border-color)] bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:border-[var(--border-hover)] hover:text-[var(--text-primary)]"
                   )}
                 >
                   {difficulty}
@@ -135,8 +135,8 @@ export default function FilterBar({
                   className={clsx(
                     "rounded-full border px-3 py-1.5 text-sm transition",
                     active
-                      ? "border-emerald-300/60 bg-emerald-300/20 text-emerald-100"
-                      : "border-white/10 bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:border-white/25 hover:text-[var(--text-primary)]"
+                      ? "border-[#9db59a] bg-[#e5efdd] text-[#446043]"
+                      : "border-[var(--border-color)] bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:border-[var(--border-hover)] hover:text-[var(--text-primary)]"
                   )}
                 >
                   {label}
@@ -159,8 +159,8 @@ export default function FilterBar({
                   className={clsx(
                     "rounded-full border px-2.5 py-1 text-xs transition",
                     active
-                      ? "border-sky-300/60 bg-sky-300/20 text-sky-100"
-                      : "border-white/10 bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:border-white/25 hover:text-[var(--text-primary)]"
+                      ? "border-[#b89457]/60 bg-[#f1e4cb] text-[#7a5b2b]"
+                      : "border-[var(--border-color)] bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:border-[var(--border-hover)] hover:text-[var(--text-primary)]"
                   )}
                 >
                   {company}
@@ -171,7 +171,7 @@ export default function FilterBar({
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-3">
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-color)] pt-3">
         <div className="inline-flex items-center gap-2 text-sm text-[var(--text-secondary)]">
           <ListFilter className="h-4 w-4" />
           <span>
@@ -187,7 +187,7 @@ export default function FilterBar({
               exit={{ opacity: 0, y: -6 }}
               type="button"
               onClick={onClearAll}
-              className="inline-flex items-center gap-1 rounded-lg border border-white/15 bg-[var(--bg-secondary)]/80 px-3 py-1.5 text-xs text-[var(--text-secondary)] transition hover:border-rose-300/60 hover:text-rose-200"
+              className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1.5 text-xs text-[var(--text-secondary)] transition hover:border-[#cf9a9a] hover:text-[#884545]"
             >
               <X className="h-3.5 w-3.5" />
               Reset Filters

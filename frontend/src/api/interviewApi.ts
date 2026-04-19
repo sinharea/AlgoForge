@@ -43,6 +43,7 @@ export type InterviewScoring = {
   edgeCases: number;
   codeQuality: number;
   hintsUsedPenalty: number;
+  skipPenalty: number;
   timePenalty: number;
   feedback: string;
   strengths: string[];
@@ -65,6 +66,8 @@ export type InterviewSessionResponse = {
     hintsGiven: number;
     struggleCount: number;
     stuckCount: number;
+    skipCount?: number;
+    skipPenalty?: number;
     stageMastery?: number;
     userStuck: boolean;
     lastComplexityComparedAt?: string | null;
@@ -88,6 +91,17 @@ export type InterviewHistoryItem = {
   status: string;
   currentStage: string;
   score: number;
+  scoring?: {
+    totalScore: number;
+    correctness: number;
+    optimality: number;
+    communication: number;
+    edgeCases: number;
+    codeQuality: number;
+    hintsUsedPenalty: number;
+    skipPenalty: number;
+    timePenalty: number;
+  } | null;
   duration: number;
   createdAt: string;
   endedAt: string | null;

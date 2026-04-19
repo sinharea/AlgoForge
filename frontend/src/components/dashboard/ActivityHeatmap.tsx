@@ -18,7 +18,7 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 const DAYS = ["", "Mon", "", "Wed", "", "Fri", ""];
 
 const getColor = (count: number): string => {
-  if (count === 0) return "bg-white/[0.04]";
+  if (count === 0) return "bg-[var(--bg-tertiary)]";
   if (count === 1) return "bg-emerald-900/60";
   if (count <= 3) return "bg-emerald-700/70";
   if (count <= 6) return "bg-emerald-500/80";
@@ -92,10 +92,10 @@ export default function ActivityHeatmap({ data, year }: Props) {
   return (
     <div>
       <div className="mb-3 flex items-center justify-between">
-        <p className="text-sm text-slate-400">
-          <span className="font-medium text-white">{totalSubmissions}</span> submissions in {year}
-          <span className="mx-2 text-white/20">·</span>
-          <span className="font-medium text-white">{totalActive}</span> active days
+        <p className="text-sm text-[var(--text-secondary)]">
+          <span className="font-medium text-[var(--text-primary)]">{totalSubmissions}</span> submissions in {year}
+          <span className="mx-2 text-[var(--text-muted)]">·</span>
+          <span className="font-medium text-[var(--text-primary)]">{totalActive}</span> active days
         </p>
       </div>
 
@@ -106,7 +106,7 @@ export default function ActivityHeatmap({ data, year }: Props) {
             {monthLabels.map((m, i) => (
               <span
                 key={`${m.label}-${i}`}
-                className="text-[10px] text-slate-500"
+                className="text-[10px] text-[var(--text-muted)]"
                 style={{ position: "relative", left: `${m.weekIndex * 13}px` }}
               >
                 {m.label}
@@ -118,7 +118,7 @@ export default function ActivityHeatmap({ data, year }: Props) {
             {/* Day labels */}
             <div className="flex flex-col gap-0.5 pr-1">
               {DAYS.map((d, i) => (
-                <span key={i} className="flex h-[11px] w-6 items-center text-[9px] text-slate-500">
+                <span key={i} className="flex h-[11px] w-6 items-center text-[9px] text-[var(--text-muted)]">
                   {d}
                 </span>
               ))}
@@ -139,9 +139,9 @@ export default function ActivityHeatmap({ data, year }: Props) {
           </div>
 
           {/* Legend */}
-          <div className="mt-2 flex items-center gap-1 pl-8 text-[10px] text-slate-500">
+          <div className="mt-2 flex items-center gap-1 pl-8 text-[10px] text-[var(--text-muted)]">
             <span>Less</span>
-            <div className="h-[11px] w-[11px] rounded-[2px] bg-white/[0.04]" />
+            <div className="h-[11px] w-[11px] rounded-[2px] bg-[var(--bg-tertiary)]" />
             <div className="h-[11px] w-[11px] rounded-[2px] bg-emerald-900/60" />
             <div className="h-[11px] w-[11px] rounded-[2px] bg-emerald-700/70" />
             <div className="h-[11px] w-[11px] rounded-[2px] bg-emerald-500/80" />

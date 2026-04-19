@@ -21,15 +21,15 @@ export const metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${bodyFont.variable} ${headingFont.variable} min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased`}>
+      <body className={`${bodyFont.variable} ${headingFont.variable} flex min-h-screen flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased`}>
         <Providers>
           <Header />
-          <main>{children}</main>
+          <main className="flex-1">{children}</main>
           <footer className="border-t border-[var(--border-color)] bg-[var(--bg-secondary)]">
             <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
               <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
                 <p className="text-sm text-[var(--text-muted)]">
-                  2024 AlgoForge. Built for developers.
+                  2026 AlgoForge. Built for developers.
                 </p>
                 <div className="flex gap-6 text-sm text-[var(--text-muted)]">
                   <a href="#" className="hover:text-[var(--text-primary)]">Terms</a>

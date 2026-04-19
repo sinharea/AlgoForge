@@ -11,7 +11,10 @@ const {
 const STUCK_PATTERN = /\b(stuck|hint|help|confused|no idea|don't know|dont know|unclear)\b/i;
 const NO_ANSWER_PATTERN = /\b(idk|i don't know|dont know|no idea|not sure|skip|pass)\b/i;
 const END_SIGNAL_PATTERN = /^(no|nope|that's all|thats all|nothing else)$/i;
-const OFF_TOPIC_PATTERN = /\b(who are you|what are you|your name|hello|hi\b|hey\b|how are you|thanks|thank you|bye|good morning|good night)\b/i;
+const SKIP_REQUEST_PATTERN = /\b(skip|pass|move on|next question|next stage|go next|can we skip|can we move on|let'?s move on)\b/i;
+const SKIP_CONFIRM_PATTERN = /(^|\b)(yes\s*skip|confirm\s*skip|skip\s*it|yes\s*move\s*on|please\s*skip|skip\s*this|yes|yeah|sure|ok|okay)(\b|$)/i;
+const SKIP_CANCEL_PATTERN = /(^|\b)(no\s*skip|don't\s*skip|dont\s*skip|no\s*move\s*on|continue|let'?s\s*continue|wait|hold\s*on|no)(\b|$)/i;
+const OFF_TOPIC_PATTERN = /\b(who are you|what are you|your name|hello|hi\b|hey\b|hlo\b|hii\b|how are you|thanks|thank you|bye|good morning|good night)\b/i;
 const INTERVIEW_STAGES = ["approach", "complexity", "edge_cases", "optimization", "coding"];
 
 const APPROACH_PATTERN = /\b(linked\s*list|pointer|two[-\s]?pointer|prev|curr|next|in[-\s]?place|recurs|iterat|hash|map|set|array|sliding\s+window|binary\s+search|dp|dynamic\s+programming|greedy|stack|queue|graph|sort|prefix|backtrack|brute)\b/i;
@@ -25,13 +28,13 @@ const MIN_DETAILED_TOKENS = 9;
 const HINT_PATTERN = /\b(hint|consider|think about|try|focus on|could you)\b/i;
 
 const REACTION_BY_ASSESSMENT = {
-  correct: "yeah, that makes sense.",
-  partial: "you're close, think about this:",
-  wrong: "hmm, not exactly...",
-  no_answer: "that's okay, let's think about it.",
+  correct: "nice, that tracks.",
+  partial: "good direction. quick tweak:",
+  wrong: "i see what you're trying, but not quite.",
+  no_answer: "no worries, let's keep it simple.",
 };
 
-const LEADING_REACTION_PATTERN = /^(yeah,?\s*that makes sense|yeah|yes|yep|good|great|exactly|correct|right|that makes sense|you're close,?\s*think about this:?|you're close|hmm,?\s*not exactly|not quite|that's okay,?\s*let'?s think about it|that's okay)[\s,.:!-]*/i;
+const LEADING_REACTION_PATTERN = /^(yeah,?\s*that makes sense|yeah|yes|yep|good|great|exactly|correct|right|that makes sense|nice,?\s*that tracks|nice|you're close,?\s*think about this:?|you're close|good direction,?\s*quick tweak:?|good direction|hmm,?\s*not exactly|not quite|i see what you're trying,?\s*but not quite|i see your direction,?\s*but not quite|that's okay,?\s*let'?s think about it|that's okay|no worries,?\s*let'?s keep it simple|no worries|no stress,?\s*let'?s take it step by step|no stress|no problem)[\s,.:!-]*/i;
 
 const stripLeadingReaction = (value = "") =>
   String(value || "")
@@ -92,10 +95,10 @@ const ensureReactionPrefix = (message, assessment) => {
   const expectedReaction = REACTION_BY_ASSESSMENT[assessment] || REACTION_BY_ASSESSMENT.partial;
   if (!text) return expectedReaction;
 
-  const startsPositive = /^(yeah|yes|yep|good|great|exactly|correct|right|that makes sense)\b/i.test(text);
-  const startsPartial = /^you're close\b/i.test(text);
-  const startsWrong = /^(hmm|not quite|i don't think|that doesn't seem right)\b/i.test(text);
-  const startsNoAnswer = /^that's okay\b/i.test(text);
+  const startsPositive = /^(yeah|yes|yep|good|great|exactly|correct|right|that makes sense|nice)\b/i.test(text);
+  const startsPartial = /^(you're close|good direction)\b/i.test(text);
+  const startsWrong = /^(hmm|not quite|i don't think|that doesn't seem right|i see what you're trying|i see your direction)\b/i.test(text);
+  const startsNoAnswer = /^(that's okay|no worries|no stress|no problem)\b/i.test(text);
 
   if (assessment === "correct" && startsPositive) return text;
   if (assessment === "partial" && startsPartial) return text;
@@ -166,6 +169,31 @@ const stageRedirectQuestion = (stage) => {
   };
 
   return prompts[normalizeStage(stage)] || prompts.approach;
+};
+
+const stageLabel = (stage) => normalizeStage(stage).replace("_", " ");
+
+const humanOffTopicResponse = (stage, userMessage = "") => {
+  const prompt = stageRedirectQuestion(stage);
+  const text = String(userMessage || "").toLowerCase();
+
+  if (/\b(thanks|thank you)\b/.test(text)) {
+    return `you're welcome. ${prompt}`;
+  }
+
+  if (/\b(how are you|how's it going|hows it going)\b/.test(text)) {
+    return `doing well, thanks. ${prompt}`;
+  }
+
+  if (/\b(hi|hello|hey)\b/.test(text)) {
+    return `hey, good to see you. ${prompt}`;
+  }
+
+  if (/\b(who are you|your name|what are you)\b/.test(text)) {
+    return `i'm your mock interviewer for this round. ${prompt}`;
+  }
+
+  return `fair point. ${prompt}`;
 };
 
 const assessUserResponse = ({ stage, userMessage }) => {
@@ -257,6 +285,104 @@ const normalizeComplexityValue = (value, fallback = "Unknown") => {
   return text.length > 90 ? `${text.slice(0, 90)}...` : text;
 };
 
+const COMPLEXITY_LEVELS = [
+  { label: "O(1)", patterns: [/o\(\s*1\s*\)/i, /\bconstant\b/i] },
+  { label: "O(log n)", patterns: [/o\(\s*log\s*n\s*\)/i, /\blog\s*n\b/i, /\blogarith/i] },
+  { label: "O(n)", patterns: [/o\(\s*n\s*\)/i, /\blinear\b/i] },
+  { label: "O(n log n)", patterns: [/o\(\s*n\s*log\s*n\s*\)/i, /\bn\s*log\s*n\b/i] },
+  { label: "O(n^2)", patterns: [/o\(\s*n\s*\^\s*2\s*\)/i, /\bo\(\s*n2\s*\)/i, /\bquadratic\b/i] },
+  { label: "O(n^3)", patterns: [/o\(\s*n\s*\^\s*3\s*\)/i, /\bcubic\b/i] },
+  { label: "O(2^n)", patterns: [/o\(\s*2\s*\^\s*n\s*\)/i, /\bexponential\b/i] },
+];
+
+const extractComplexityLabel = (text = "") => {
+  const value = String(text || "");
+  if (!value.trim()) return null;
+
+  for (const complexity of COMPLEXITY_LEVELS) {
+    if (complexity.patterns.some((pattern) => pattern.test(value))) {
+      return complexity.label;
+    }
+  }
+
+  return null;
+};
+
+const complexityRank = (label = "") => {
+  const normalized = String(label || "").trim();
+  const order = {
+    "O(1)": 1,
+    "O(log n)": 2,
+    "O(n)": 3,
+    "O(n log n)": 4,
+    "O(n^2)": 5,
+    "O(n^3)": 6,
+    "O(2^n)": 7,
+  };
+
+  return order[normalized] ?? null;
+};
+
+const inferComplexityFromMessages = (messages = []) => {
+  const userMessages = (messages || [])
+    .filter((message) => message.role === "user")
+    .map((message) => String(message.content || "").trim())
+    .filter(Boolean)
+    .reverse();
+
+  for (const message of userMessages) {
+    const label = extractComplexityLabel(message);
+    if (label) return label;
+  }
+
+  return null;
+};
+
+const inferComplexityFromCode = (code = "") => {
+  const snippet = String(code || "");
+  if (!snippet.trim()) return null;
+
+  const explicitComplexity = extractComplexityLabel(snippet);
+  if (explicitComplexity) return explicitComplexity;
+
+  const loopPattern = /\b(for|while)\b/gi;
+  const loopCount = (snippet.match(loopPattern) || []).length;
+  const hasTripleNestedLoop = /(for|while)[\s\S]{0,220}(for|while)[\s\S]{0,220}(for|while)/i.test(snippet);
+  const hasDoubleNestedLoop = /(for|while)[\s\S]{0,160}(for|while)/i.test(snippet);
+
+  if (hasTripleNestedLoop) return "O(n^3)";
+  if (hasDoubleNestedLoop) return "O(n^2)";
+  if (loopCount >= 1) return "O(n)";
+  return "O(1)";
+};
+
+const scoreOptimalityFromSignals = ({
+  targetComplexity,
+  explanationComplexity,
+  codeComplexity,
+  stageIndex,
+}) => {
+  const targetRank = complexityRank(extractComplexityLabel(targetComplexity || "") || "");
+  const explanationRank = complexityRank(explanationComplexity || "");
+  const codeRank = complexityRank(codeComplexity || "");
+  const observed = [explanationRank, codeRank].filter((value) => Number.isFinite(value));
+
+  if (Number.isFinite(targetRank) && observed.length > 0) {
+    const avgDiff =
+      observed.reduce((sum, value) => sum + Math.abs(value - targetRank), 0) /
+      observed.length;
+
+    if (avgDiff <= 0.5) return 22;
+    if (avgDiff <= 1.5) return 16;
+    if (avgDiff <= 2.5) return 10;
+    return 6;
+  }
+
+  if (observed.length === 2) return 14;
+  if (observed.length === 1) return stageIndex >= 1 ? 10 : 7;
+  return stageIndex >= 1 ? 8 : 5;
+};
+
 const getRecentUserSolution = (messages = [], maxMessages = 5) => {
   const recentUserMessages = messages
     .filter((message) => message.role === "user")
@@ -265,6 +391,31 @@ const getRecentUserSolution = (messages = [], maxMessages = 5) => {
     .filter(Boolean);
 
   return recentUserMessages.join("\n\n").trim();
+};
+
+const hasMeaningfulCodeSnapshot = (snapshot) => {
+  const code = String(snapshot?.code || "").trim();
+  if (code.length < 24) return false;
+
+  const hasProgrammingSignal =
+    /(function|def\s+|class\s+|for\s*\(|while\s*\(|if\s*\(|=>|return\s+|public\s+|private\s+|let\s+|const\s+|var\s+)/i.test(
+      code
+    );
+
+  return hasProgrammingSignal || code.split(/\r?\n/).filter(Boolean).length >= 4;
+};
+
+const latestCodeSnapshotText = (codeSnapshots = []) => {
+  const latest =
+    Array.isArray(codeSnapshots) && codeSnapshots.length > 0
+      ? codeSnapshots[codeSnapshots.length - 1]
+      : null;
+
+  if (!latest || !hasMeaningfulCodeSnapshot(latest)) {
+    return "";
+  }
+
+  return trimText(String(latest.code || ""), 1600);
 };
 
 const MAX_COMPLEXITY_HISTORY = 20;
@@ -380,22 +531,16 @@ const startInterviewSession = async ({ userId, problemId }) => {
     throw ApiError.notFound("Problem not found");
   }
 
-  const existingSession = await InterviewSession.findOne({
-    userId,
-    problemId: problem._id,
-  }).sort({ createdAt: -1 });
-
-  if (existingSession?.messages?.length) {
-    return toSessionResponse(existingSession, problem, {
-      limit: interviewChatPageSize,
-    });
-  }
-
   const currentState = {
     phase: "active",
     hintsGiven: 0,
     stuckCount: 0,
     struggleCount: 0,
+    skipCount: 0,
+    skipPenalty: 0,
+    pendingSkipConfirmation: false,
+    pendingSkipStage: "",
+    pendingSkipAskedAtTurn: 0,
     stageMastery: 0,
     userStuck: false,
     turn: 1,
@@ -414,29 +559,6 @@ const startInterviewSession = async ({ userId, problemId }) => {
     latestUserAnswer: "",
     isSessionStart: true,
   });
-
-  if (existingSession) {
-    existingSession.messages = [
-      {
-        role: "interviewer",
-        content: firstMessageContent,
-        timestamp: new Date(),
-      },
-    ];
-    existingSession.currentStage = currentStage;
-    existingSession.currentState = {
-      ...currentState,
-      lastInterviewerQuestion: firstMessageContent,
-    };
-    await existingSession.save();
-
-    return {
-      ...toSessionResponse(existingSession, problem, {
-        limit: interviewChatPageSize,
-      }),
-      firstMessage: existingSession.messages[0],
-    };
-  }
 
   const session = await InterviewSession.create({
     userId,
@@ -481,31 +603,74 @@ const respondInterviewSession = async ({ userId, sessionId, userMessage }) => {
   if (!normalizedMessage) {
     throw ApiError.badRequest("userMessage is required");
   }
+  const lowerNormalizedMessage = normalizedMessage.toLowerCase();
 
   const resolvedCurrentStage = normalizeStage(
     session.currentStage || session.currentState?.currentStage || "approach"
   );
-  const isOffTopic = OFF_TOPIC_PATTERN.test(normalizedMessage.toLowerCase());
-  const answerAssessment = assessUserResponse({
+  const isOffTopic = OFF_TOPIC_PATTERN.test(lowerNormalizedMessage);
+  const latestCodeContext = latestCodeSnapshotText(session.codeSnapshots || []);
+  const hasCodeContext = Boolean(latestCodeContext);
+
+  let answerAssessment = assessUserResponse({
     stage: resolvedCurrentStage,
     userMessage: normalizedMessage,
   });
-  const isEndSignal = END_SIGNAL_PATTERN.test(normalizedMessage.toLowerCase());
+
+  // If editor code exists but message is short, avoid treating the candidate as having no approach.
+  if (!isOffTopic && answerAssessment === "no_answer" && hasCodeContext && resolvedCurrentStage === "approach") {
+    answerAssessment = "partial";
+  }
+
+  const isEndSignal = END_SIGNAL_PATTERN.test(lowerNormalizedMessage);
+  const hasPendingSkipConfirmation =
+    Boolean(session.currentState?.pendingSkipConfirmation) &&
+    (session.currentState?.pendingSkipStage || resolvedCurrentStage) === resolvedCurrentStage;
+  const wantsSkipStage = !isOffTopic && SKIP_REQUEST_PATTERN.test(lowerNormalizedMessage);
+  const confirmsSkipStage =
+    hasPendingSkipConfirmation && SKIP_CONFIRM_PATTERN.test(lowerNormalizedMessage);
+  const cancelsSkipStage =
+    hasPendingSkipConfirmation &&
+    (SKIP_CANCEL_PATTERN.test(lowerNormalizedMessage) ||
+      answerAssessment === "correct" ||
+      answerAssessment === "partial" ||
+      answerAssessment === "wrong");
+
+  const shouldAskSkipConfirmation = wantsSkipStage && !hasPendingSkipConfirmation;
+  const shouldRepeatSkipConfirmation =
+    hasPendingSkipConfirmation && !confirmsSkipStage && !cancelsSkipStage;
+  const shouldSkipStage = !isOffTopic && confirmsSkipStage;
+  const isSkipHandshakeTurn =
+    !isOffTopic && (shouldAskSkipConfirmation || shouldRepeatSkipConfirmation);
 
   const messageSignalsStuck = STUCK_PATTERN.test(normalizedMessage);
   const isStruggleResponse =
     !isOffTopic &&
+    !isSkipHandshakeTurn &&
     (messageSignalsStuck || answerAssessment === "wrong" || answerAssessment === "no_answer");
 
   let nextStuckCount = isStruggleResponse
     ? (session.currentState?.struggleCount ?? session.currentState?.stuckCount ?? 0) + 1
     : Math.max(0, (session.currentState?.struggleCount ?? session.currentState?.stuckCount ?? 0) - 1);
 
+  const currentSkipCount = Number(session.currentState?.skipCount || 0);
+  const currentSkipPenalty = Number(session.currentState?.skipPenalty || 0);
+  const nextSkipCount = shouldSkipStage ? currentSkipCount + 1 : currentSkipCount;
+  const nextSkipPenalty = shouldSkipStage
+    ? Math.min(currentSkipPenalty + 4, 25)
+    : currentSkipPenalty;
+
   const currentStageMastery = Number(session.currentState?.stageMastery || 0);
   let nextStageMastery = currentStageMastery;
+  const isProductiveResponse =
+    answerAssessment === "correct" || answerAssessment === "partial";
 
-  if (!isOffTopic) {
+  if (!isOffTopic && !isSkipHandshakeTurn) {
     if (answerAssessment === "correct") {
+      // A confident stage answer should advance promptly.
+      nextStageMastery = Math.min(currentStageMastery + 2, 2);
+    } else if (answerAssessment === "partial") {
+      // Partial-but-relevant answers still indicate progress.
       nextStageMastery = Math.min(currentStageMastery + 1, 2);
     } else if (answerAssessment === "wrong" || answerAssessment === "no_answer") {
       nextStageMastery = 0;
@@ -514,13 +679,19 @@ const respondInterviewSession = async ({ userId, sessionId, userMessage }) => {
 
   const forceMoveForward =
     !isOffTopic &&
-    ((isStruggleResponse && nextStuckCount >= 3) || (isEndSignal && nextStuckCount >= 1));
+    (shouldSkipStage ||
+      (isStruggleResponse && nextStuckCount >= 3) ||
+      (isEndSignal && nextStuckCount >= 1));
 
-  const isReadyToProgress = !isOffTopic && answerAssessment === "correct" && nextStageMastery >= 2;
+  const isReadyToProgress =
+    !isOffTopic && isProductiveResponse && nextStageMastery >= 2;
   const progressedStage =
     isReadyToProgress || forceMoveForward
       ? nextStage(resolvedCurrentStage)
       : resolvedCurrentStage;
+  const isTerminalCodingStage =
+    resolvedCurrentStage === INTERVIEW_STAGES[INTERVIEW_STAGES.length - 1] &&
+    progressedStage === resolvedCurrentStage;
 
   if (progressedStage !== resolvedCurrentStage) {
     nextStuckCount = 0;
@@ -533,11 +704,25 @@ const respondInterviewSession = async ({ userId, sessionId, userMessage }) => {
     timestamp: new Date(),
   });
 
+  const nextPendingSkipConfirmation =
+    shouldAskSkipConfirmation || shouldRepeatSkipConfirmation;
+  const nextPendingSkipStage = nextPendingSkipConfirmation ? resolvedCurrentStage : "";
+  const nextPendingSkipAskedAtTurn = nextPendingSkipConfirmation
+    ? shouldAskSkipConfirmation
+      ? (session.currentState?.turn || 0) + 1
+      : Number(session.currentState?.pendingSkipAskedAtTurn || (session.currentState?.turn || 0) + 1)
+    : 0;
+
   const draftState = {
     phase: "active",
     hintsGiven: session.currentState?.hintsGiven || 0,
     stuckCount: nextStuckCount,
     struggleCount: nextStuckCount,
+    skipCount: nextSkipCount,
+    skipPenalty: nextSkipPenalty,
+    pendingSkipConfirmation: nextPendingSkipConfirmation,
+    pendingSkipStage: nextPendingSkipStage,
+    pendingSkipAskedAtTurn: nextPendingSkipAskedAtTurn,
     stageMastery: nextStageMastery,
     userStuck: nextStuckCount >= 2,
     turn: (session.currentState?.turn || 0) + 1,
@@ -555,10 +740,19 @@ const respondInterviewSession = async ({ userId, sessionId, userMessage }) => {
   const avoidQuestion = recentInterviewerQuestions.join(" || ");
 
   const mustForceHint = !isOffTopic && nextStuckCount >= 2 && progressedStage === resolvedCurrentStage;
+  const shouldSuggestEnding =
+    isTerminalCodingStage && (shouldSkipStage || nextStuckCount >= 2 || isEndSignal);
   let interviewerContent;
 
   if (isOffTopic) {
-    interviewerContent = stageRedirectQuestion(progressedStage);
+    interviewerContent = humanOffTopicResponse(progressedStage, normalizedMessage);
+  } else if (shouldAskSkipConfirmation || shouldRepeatSkipConfirmation) {
+    interviewerContent = `quick check: do you want to skip the ${stageLabel(resolvedCurrentStage)} part? reply "yes skip" to confirm, or answer normally and we'll continue.`;
+  } else if (shouldSuggestEnding) {
+    interviewerContent =
+      "no worries, we can stop here. i marked this final stage as skipped, so end the interview to view your score and feedback.";
+  } else if (shouldSkipStage) {
+    interviewerContent = `no problem, we'll skip this and move on. ${stageRedirectQuestion(progressedStage)}`;
   } else if (mustForceHint) {
     interviewerContent = stageFallbackQuestion(
       progressedStage,
@@ -577,6 +771,7 @@ const respondInterviewSession = async ({ userId, sessionId, userMessage }) => {
       answerAssessment,
       avoidQuestion,
       latestUserAnswer: normalizedMessage,
+      latestCodeContext,
     });
   }
 
@@ -590,6 +785,7 @@ const respondInterviewSession = async ({ userId, sessionId, userMessage }) => {
       answerAssessment,
       avoidQuestion,
       latestUserAnswer: normalizedMessage,
+      latestCodeContext,
       retryCount: 1,
     });
   }
@@ -710,6 +906,11 @@ const compareInterviewSessionComplexity = async ({ userId, sessionId, userSoluti
       hintsGiven: 0,
       stuckCount: 0,
       struggleCount: 0,
+      skipCount: 0,
+      skipPenalty: 0,
+      pendingSkipConfirmation: false,
+      pendingSkipStage: "",
+      pendingSkipAskedAtTurn: 0,
       stageMastery: 0,
       userStuck: false,
       turn: 0,
@@ -746,9 +947,14 @@ const getInterviewSession = async ({ userId, sessionId, beforeIndex, limit }) =>
     throw ApiError.forbidden("You can only access your own interview sessions");
   }
 
+  const resolvedLimit =
+    limit === undefined || limit === null || limit === ""
+      ? MAX_CHAT_PAGE_SIZE
+      : limit;
+
   return toSessionResponse(session, session.problemId, {
     beforeIndex,
-    limit,
+    limit: resolvedLimit,
   });
 };
 
@@ -763,9 +969,14 @@ const getInterviewSessionMessages = async ({ userId, sessionId, beforeIndex, lim
     throw ApiError.forbidden("You can only access your own interview sessions");
   }
 
+  const resolvedLimit =
+    limit === undefined || limit === null || limit === ""
+      ? MAX_CHAT_PAGE_SIZE
+      : limit;
+
   const paged = paginateMessages(session.messages, {
     beforeIndex,
-    limit,
+    limit: resolvedLimit,
   });
 
   return {
@@ -788,7 +999,10 @@ module.exports = {
 };
 
 async function endInterviewSession({ userId, sessionId, status = "completed" }) {
-  const session = await InterviewSession.findById(sessionId);
+  const session = await InterviewSession.findById(sessionId).populate(
+    "problemId",
+    "optimalComplexity"
+  );
   if (!session) throw ApiError.notFound("Interview session not found");
   if (String(session.userId) !== String(userId)) throw ApiError.forbidden("Not your session");
   if (session.status !== "active") throw ApiError.badRequest("Session is already ended");
@@ -809,6 +1023,8 @@ async function endInterviewSession({ userId, sessionId, status = "completed" }) 
   let edgeCases = 0;
   let codeQuality = 0;
 
+  const userMessages = (session.messages || []).filter((m) => m.role === "user");
+
   // Optimality: based on complexity comparisons
   const comparisons = session.complexityComparisons || [];
   if (comparisons.length > 0) {
@@ -820,10 +1036,23 @@ async function endInterviewSession({ userId, sessionId, status = "completed" }) 
     } else {
       optimality = 5;
     }
+  } else {
+    const explanationComplexity = inferComplexityFromMessages(session.messages || []);
+    const latestCodeSnapshot =
+      Array.isArray(session.codeSnapshots) && session.codeSnapshots.length > 0
+        ? session.codeSnapshots[session.codeSnapshots.length - 1]
+        : null;
+    const codeComplexity = inferComplexityFromCode(latestCodeSnapshot?.code || "");
+
+    optimality = scoreOptimalityFromSignals({
+      targetComplexity: session.problemId?.optimalComplexity?.time || "",
+      explanationComplexity,
+      codeComplexity,
+      stageIndex,
+    });
   }
 
   // Communication: based on message count and struggle ratio
-  const userMessages = (session.messages || []).filter((m) => m.role === "user");
   const struggleRatio = userMessages.length > 0 ? (state.struggleCount || 0) / userMessages.length : 1;
   communication = Math.round(Math.max(0, 20 * (1 - struggleRatio)));
 
@@ -837,10 +1066,11 @@ async function endInterviewSession({ userId, sessionId, status = "completed" }) 
 
   // Penalties
   const hintsUsedPenalty = Math.min((state.hintsGiven || 0) * 3, 15);
+  const skipPenalty = Math.min(Number(state.skipPenalty || 0), 25);
   const timePenalty = session.duration > 3600 ? 10 : session.duration > 1800 ? 5 : 0;
 
   const totalScore = Math.max(0, Math.min(100,
-    correctness + optimality + communication + edgeCases + codeQuality - hintsUsedPenalty - timePenalty
+    correctness + optimality + communication + edgeCases + codeQuality - hintsUsedPenalty - skipPenalty - timePenalty
   ));
 
   const strengths = [];
@@ -851,6 +1081,7 @@ async function endInterviewSession({ userId, sessionId, status = "completed" }) 
   if (correctness < 15) weaknesses.push("Needs work on approaching problems");
   if (optimality < 10) weaknesses.push("Complexity analysis needs improvement");
   if (communication < 10) weaknesses.push("Communication could be clearer");
+  if ((state.skipCount || 0) > 0) weaknesses.push("Too many skipped stages reduced depth of evaluation");
 
   session.scoring = {
     totalScore,
@@ -860,6 +1091,7 @@ async function endInterviewSession({ userId, sessionId, status = "completed" }) 
     edgeCases,
     codeQuality,
     hintsUsedPenalty,
+    skipPenalty,
     timePenalty,
     feedback: totalScore >= 70 ? "Great performance! You showed solid problem-solving skills." :
               totalScore >= 40 ? "Good attempt. Focus on the areas marked as weaknesses." :
@@ -904,7 +1136,7 @@ async function getInterviewHistory({ userId, page = 1, limit = 10, status = "all
   const [sessions, total] = await Promise.all([
     InterviewSession.find(filter)
       .populate("problemId", "title slug difficulty")
-      .select("problemId status currentStage scoring.totalScore duration createdAt endedAt")
+      .select("problemId status currentStage scoring duration createdAt endedAt")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(safeLimit)
@@ -924,6 +1156,19 @@ async function getInterviewHistory({ userId, page = 1, limit = 10, status = "all
       status: s.status,
       currentStage: s.currentStage,
       score: s.scoring?.totalScore || 0,
+      scoring: s.scoring
+        ? {
+            totalScore: s.scoring.totalScore || 0,
+            correctness: s.scoring.correctness || 0,
+            optimality: s.scoring.optimality || 0,
+            communication: s.scoring.communication || 0,
+            edgeCases: s.scoring.edgeCases || 0,
+            codeQuality: s.scoring.codeQuality || 0,
+            hintsUsedPenalty: s.scoring.hintsUsedPenalty || 0,
+            skipPenalty: s.scoring.skipPenalty || 0,
+            timePenalty: s.scoring.timePenalty || 0,
+          }
+        : null,
       duration: s.duration || 0,
       createdAt: s.createdAt,
       endedAt: s.endedAt,

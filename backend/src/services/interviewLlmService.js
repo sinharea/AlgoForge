@@ -13,8 +13,8 @@ const MAX_PROBLEM_CHARS = 4600;
 const MAX_HISTORY_CHARS = 3600;
 const MAX_USER_ANSWER_CHARS = 700;
 const MAX_RESPONSE_CHARS = 360;
-const LLM_TEMPERATURE = 0.1;
-const LLM_TOP_P = 0.25;
+const LLM_TEMPERATURE = 0.35;
+const LLM_TOP_P = 0.8;
 const DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 const DEFAULT_OPENROUTER_MODEL = "openai/gpt-oss-120b:free";
 
@@ -52,6 +52,7 @@ const buildInterviewerPrompt = ({
   struggleCount,
   answerAssessment,
   latestUserAnswer,
+  latestCodeContext,
   avoidQuestion,
 }) => `You are a senior software engineer conducting a realistic live coding interview.
 
@@ -69,6 +70,9 @@ ${conversationHistory}
 Candidate's latest answer:
 ${clampText(latestUserAnswer || "", MAX_USER_ANSWER_CHARS) || "No answer yet."}
 
+Candidate's latest code snapshot from editor (optional):
+${clampText(latestCodeContext || "", 1400) || "No code snapshot provided."}
+
 Current interview stage: ${currentStage}
 Stage depth completed in this stage: ${Number(stageMastery || 0)} / 2
 Candidate struggle level: ${struggleCount}
@@ -84,14 +88,15 @@ Stage focus (strict):
 Behavior rules:
 1) Start by reacting to the candidate's latest answer naturally.
 2) Then ask exactly one focused follow-up question tied to the stage.
-3) Keep total response to 1-2 short lines, max 45 words.
-4) No generic filler, no motivational talk, no off-topic comments.
+3) Keep total response to 1-2 short lines, max 55 words.
+4) Sound like a real human interviewer: concise, warm, and technical.
 5) Do not repeat previous interviewer wording.
 6) If struggleCount is 2+, include a targeted hint before the follow-up question.
 7) Ask questions that a real interviewer at a strong engineering company would ask.
 8) Never agree with a wrong or unclear answer.
 9) If answerAssessment is "wrong" or "no_answer", challenge directly with mild objection.
 10) If answerAssessment is "partial", acknowledge partial progress but do not confirm correctness.
+11) If latest answer is short but code snapshot exists, infer likely approach from code and ask candidate to confirm/justify; do not claim they provided nothing.
 
 Do not repeat this wording:
 ${avoidQuestion || "N/A"}
@@ -99,10 +104,10 @@ ${avoidQuestion || "N/A"}
 Return only the next interviewer message text. No markdown, no bullets.`;
 
 const reactionMap = {
-  correct: "yeah, that makes sense.",
-  partial: "you're close, think about this:",
-  wrong: "hmm, not exactly...",
-  no_answer: "that's okay, let's think about it.",
+  correct: "nice, that tracks.",
+  partial: "good direction. quick tweak:",
+  wrong: "i see your direction, but not quite.",
+  no_answer: "no stress, let's take it step by step.",
 };
 
 const stageFallbackQuestions = {
@@ -353,6 +358,7 @@ const generateInterviewerMessage = async ({
   struggleCount,
   answerAssessment,
   latestUserAnswer,
+  latestCodeContext,
   avoidQuestion,
   retryCount = 0,
   isSessionStart = false,
@@ -367,6 +373,7 @@ const generateInterviewerMessage = async ({
     struggleCount,
     answerAssessment,
     latestUserAnswer,
+    latestCodeContext,
     avoidQuestion,
   });
 

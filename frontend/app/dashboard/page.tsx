@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -9,9 +9,7 @@ import {
   BarChart3,
   CheckCircle2,
   Flame,
-  Moon,
   Sparkles,
-  Sun,
   Target,
   Trophy,
   XCircle,
@@ -77,7 +75,6 @@ const computeStreak = (submissions: any[]) => {
 export default function DashboardPage() {
   useProtectedRoute();
   const { user } = useAuthContext();
-  const [isLightMode, setIsLightMode] = useState(false);
 
   const dashboardQuery = useQuery({
     queryKey: ["dashboard-stats"],
@@ -221,42 +218,27 @@ export default function DashboardPage() {
     );
   }
 
-  const containerClasses = isLightMode
-    ? "bg-gradient-to-b from-slate-100 via-slate-50 to-white text-slate-900"
-    : "bg-gradient-to-b from-[#06070d] via-[#0b1020] to-[#05060a] text-white";
-
-  const cardTextMuted = isLightMode ? "text-slate-500" : "text-slate-400";
-
   return (
-    <div className={`${containerClasses} min-h-screen transition-colors duration-300`}>
+    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-r from-blue-900/40 via-violet-900/30 to-cyan-900/30 p-6 shadow-[0_18px_70px_-28px_rgba(59,130,246,.75)] backdrop-blur"
+          className="relative overflow-hidden rounded-3xl border border-[var(--border-color)] bg-gradient-to-r from-[#f5ead5] via-[#fdf8ed] to-[#f2e3c6] p-6 shadow-[0_18px_60px_-30px_rgba(92,67,31,0.72)]"
         >
-          <div className="pointer-events-none absolute -right-24 -top-16 h-48 w-48 rounded-full bg-violet-500/30 blur-3xl" />
-          <div className="pointer-events-none absolute -left-20 -bottom-20 h-56 w-56 rounded-full bg-cyan-500/20 blur-3xl" />
+          <div className="pointer-events-none absolute -right-24 -top-16 h-48 w-48 rounded-full bg-[#cfa968]/25 blur-3xl" />
+          <div className="pointer-events-none absolute -left-20 -bottom-20 h-56 w-56 rounded-full bg-[#b98b44]/20 blur-3xl" />
 
           <div className="relative flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className={`text-sm ${cardTextMuted}`}>Welcome back</p>
+              <p className="text-sm text-[var(--text-muted)]">Welcome back</p>
               <h1 className="mt-1 text-3xl font-semibold tracking-tight md:text-4xl">
                 {data.userName}&apos;s Engineering Dashboard
               </h1>
-              <p className={`mt-2 max-w-2xl text-sm md:text-base ${cardTextMuted}`}>
+              <p className="mt-2 max-w-2xl text-sm md:text-base text-[var(--text-secondary)]">
                 Your performance command center across problems, patterns, momentum, and contest readiness.
               </p>
             </div>
-
-            <button
-              type="button"
-              onClick={() => setIsLightMode((prev) => !prev)}
-              className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm font-medium hover:bg-white/20"
-            >
-              {isLightMode ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-              {isLightMode ? "Dark" : "Light"} mode
-            </button>
           </div>
         </motion.div>
 
@@ -295,7 +277,7 @@ export default function DashboardPage() {
           <ChartCard
             title="Difficulty Distribution"
             subtitle="Share of accepted problems by difficulty"
-            action={<Target className="h-4 w-4 text-violet-300" />}
+            action={<Target className="h-4 w-4 text-[var(--accent-muted)]" />}
           >
             <div className="h-[280px]">
               <ResponsiveContainer width="100%" height="100%">
@@ -317,8 +299,8 @@ export default function DashboardPage() {
                   </Pie>
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: "#0f1220",
-                      border: "1px solid rgba(148,163,184,.3)",
+                      backgroundColor: "var(--bg-secondary)",
+                      border: "1px solid var(--border-color)",
                       borderRadius: "0.75rem",
                     }}
                   />
@@ -327,7 +309,7 @@ export default function DashboardPage() {
             </div>
             <div className="mt-4 flex flex-wrap gap-3">
               {difficultyData.map((item) => (
-                <div key={item.name} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300">
+                <div key={item.name} className="inline-flex items-center gap-2 rounded-full border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1 text-xs text-[var(--text-secondary)]">
                   <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
                   {item.name} {item.value}
                 </div>
@@ -338,7 +320,7 @@ export default function DashboardPage() {
           <ChartCard
             title="Topics Breakdown"
             subtitle="Top concepts by solved frequency"
-            action={<BarChart3 className="h-4 w-4 text-cyan-300" />}
+            action={<BarChart3 className="h-4 w-4 text-[var(--accent-muted)]" />}
           >
             <div className="h-[280px]">
               <ResponsiveContainer width="100%" height="100%">
@@ -355,8 +337,8 @@ export default function DashboardPage() {
                   />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: "#0f1220",
-                      border: "1px solid rgba(148,163,184,.3)",
+                      backgroundColor: "var(--bg-secondary)",
+                      border: "1px solid var(--border-color)",
                       borderRadius: "0.75rem",
                     }}
                   />
@@ -374,38 +356,38 @@ export default function DashboardPage() {
           </ChartCard>
         </section>
 
-        <section className="mt-6 rounded-2xl border border-white/10 bg-[#111525]/90 p-5 shadow-[0_18px_40px_-30px_rgba(14,165,233,.9)]">
+        <section className="mt-6 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-elevated)] p-5 shadow-[0_18px_40px_-30px_rgba(92,67,31,0.62)]">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="text-base font-semibold text-white">Overall Progress</h3>
-              <p className={`text-sm ${cardTextMuted}`}>
+              <h3 className="text-base font-semibold text-[var(--text-primary)]">Overall Progress</h3>
+              <p className="text-sm text-[var(--text-secondary)]">
                 {data.totalSolved}/{data.totalProblems} problems solved
               </p>
             </div>
-            <span className="rounded-full border border-cyan-400/30 bg-cyan-500/15 px-3 py-1 text-sm font-medium text-cyan-300">
+            <span className="rounded-full border border-[#b89457]/45 bg-[#efe3cd] px-3 py-1 text-sm font-medium text-[#7a5b2b]">
               {progressPercent}% complete
             </span>
           </div>
 
-          <div className="relative h-4 overflow-hidden rounded-full bg-white/10">
+          <div className="relative h-4 overflow-hidden rounded-full bg-[var(--border-color)]">
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${progressPercent}%` }}
               transition={{ duration: 1.2, ease: "easeOut" }}
-              className="h-full rounded-full bg-gradient-to-r from-cyan-400 via-blue-500 to-violet-500"
+              className="h-full rounded-full bg-gradient-to-r from-[#c59a56] via-[#ab7f3f] to-[#8f6f3b]"
             />
 
             {milestones.map((milestone) => (
               <div
                 key={milestone}
-                className="absolute top-0 h-full w-px bg-white/30"
+                className="absolute top-0 h-full w-px bg-[#c9b490]"
                 style={{ left: `${milestone}%` }}
                 title={`${milestone}%`}
               />
             ))}
           </div>
 
-          <div className={`mt-2 flex justify-between text-xs ${cardTextMuted}`}>
+          <div className="mt-2 flex justify-between text-xs text-[var(--text-muted)]">
             <span>Start</span>
             <span>25%</span>
             <span>50%</span>
@@ -415,10 +397,10 @@ export default function DashboardPage() {
         </section>
 
         {/* Activity Heatmap */}
-        <section className="mt-6 rounded-2xl border border-white/10 bg-[#111525]/90 p-5">
+        <section className="mt-6 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-elevated)] p-5">
           <div className="mb-4">
-            <h3 className="text-base font-semibold text-white">Activity</h3>
-            <p className={`text-sm ${cardTextMuted}`}>Your submission activity over the year</p>
+            <h3 className="text-base font-semibold text-[var(--text-primary)]">Activity</h3>
+            <p className="text-sm text-[var(--text-secondary)]">Your submission activity over the year</p>
           </div>
           <ActivityHeatmap
             data={heatmapQuery.data || []}
@@ -430,10 +412,10 @@ export default function DashboardPage() {
           <ChartCard
             title="Recommended Problems"
             subtitle="Precision picks for your next growth loop"
-            action={<Sparkles className="h-4 w-4 text-amber-300" />}
+            action={<Sparkles className="h-4 w-4 text-[var(--accent-muted)]" />}
           >
             {data.recommendations.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-white/20 bg-white/5 p-8 text-center text-sm text-slate-400">
+              <div className="rounded-xl border border-dashed border-[var(--border-color)] bg-[var(--bg-secondary)] p-8 text-center text-sm text-[var(--text-secondary)]">
                 No recommendations yet. Solve 5 more problems to personalize this feed.
               </div>
             ) : (
@@ -446,19 +428,19 @@ export default function DashboardPage() {
           </ChartCard>
 
           <div className="grid gap-6">
-            <ChartCard title="Daily Streak" subtitle="Consistency compounds quickly" action={<Flame className="h-4 w-4 text-orange-300" />}>
-              <div className="flex items-center justify-between rounded-xl border border-orange-400/20 bg-orange-500/10 p-4">
+            <ChartCard title="Daily Streak" subtitle="Consistency compounds quickly" action={<Flame className="h-4 w-4 text-[#c98a2b]" />}>
+              <div className="flex items-center justify-between rounded-xl border border-[#d7b07a] bg-[#f3e6d2] p-4">
                 <div>
-                  <p className="text-3xl font-semibold text-white">{data.streakDays} days</p>
-                  <p className="mt-1 text-sm text-orange-200">Keep it up! You are in rhythm.</p>
+                  <p className="text-3xl font-semibold text-[var(--text-primary)]">{data.streakDays} days</p>
+                  <p className="mt-1 text-sm text-[#8c5c26]">Keep it up! You are in rhythm.</p>
                 </div>
-                <Flame className="h-10 w-10 text-orange-300" />
+                <Flame className="h-10 w-10 text-[#c98a2b]" />
               </div>
             </ChartCard>
 
-            <ChartCard title="Contest Performance" subtitle="Rating trend preview" action={<Activity className="h-4 w-4 text-blue-300" />}>
-              <div className="rounded-xl border border-white/10 bg-gradient-to-br from-blue-500/10 to-violet-500/10 p-4">
-                <p className="text-sm text-slate-300">Live rating graph integration coming in next iteration.</p>
+            <ChartCard title="Contest Performance" subtitle="Rating trend preview" action={<Activity className="h-4 w-4 text-[var(--accent-muted)]" />}>
+              <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-4">
+                <p className="text-sm text-[var(--text-secondary)]">Live rating graph integration coming in next iteration.</p>
                 <div className="mt-3 flex h-20 items-end gap-1">
                   {[8, 15, 22, 16, 28, 34, 30, 36].map((h, idx) => (
                     <motion.div
@@ -466,7 +448,7 @@ export default function DashboardPage() {
                       initial={{ height: 0 }}
                       animate={{ height: `${h * 2}px` }}
                       transition={{ duration: 0.35, delay: idx * 0.05 }}
-                      className="w-3 rounded-sm bg-gradient-to-t from-cyan-400/70 to-violet-400/80"
+                      className="w-3 rounded-sm bg-gradient-to-t from-[#c59a56] to-[#8f6f3b]"
                     />
                   ))}
                 </div>
@@ -476,17 +458,17 @@ export default function DashboardPage() {
         </section>
 
         <section className="mt-6 grid gap-6 xl:grid-cols-2">
-          <ChartCard title="Recent Activity" subtitle="Last 5 solved problems" action={<AlarmClock className="h-4 w-4 text-emerald-300" />}>
+          <ChartCard title="Recent Activity" subtitle="Last 5 solved problems" action={<AlarmClock className="h-4 w-4 text-[var(--accent-muted)]" />}>
             {data.recentActivity.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-white/15 p-6 text-center text-sm text-slate-400">
+              <div className="rounded-lg border border-dashed border-[var(--border-color)] p-6 text-center text-sm text-[var(--text-secondary)]">
                 Start solving to populate your activity timeline.
               </div>
             ) : (
               <ul className="space-y-3">
                 {data.recentActivity.map((item) => (
-                  <li key={item.id} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-                    <span className="text-sm text-slate-100">{item.title}</span>
-                    <span className="text-xs text-slate-400">
+                  <li key={item.id} className="flex items-center justify-between rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-2">
+                    <span className="text-sm text-[var(--text-primary)]">{item.title}</span>
+                    <span className="text-xs text-[var(--text-secondary)]">
                       {formatDistanceToNow(new Date(item.solvedAt), { addSuffix: true })}
                     </span>
                   </li>
@@ -502,15 +484,15 @@ export default function DashboardPage() {
                   key={achievement.id}
                   className={`rounded-xl border p-3 ${
                     achievement.earned
-                      ? "border-emerald-400/30 bg-emerald-500/10"
-                      : "border-white/10 bg-white/5"
+                      ? "border-[#9ed6b7] bg-[#e8f7ed]"
+                      : "border-[var(--border-color)] bg-[var(--bg-secondary)]"
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <Trophy className={`h-4 w-4 ${achievement.earned ? "text-emerald-300" : "text-slate-500"}`} />
-                    <p className="text-sm font-medium text-white">{achievement.title}</p>
+                    <Trophy className={`h-4 w-4 ${achievement.earned ? "text-[#2f6f4e]" : "text-[var(--text-muted)]"}`} />
+                    <p className="text-sm font-medium text-[var(--text-primary)]">{achievement.title}</p>
                   </div>
-                  <p className={`mt-1 text-xs ${achievement.earned ? "text-emerald-100" : "text-slate-400"}`}>
+                  <p className={`mt-1 text-xs ${achievement.earned ? "text-[#21573d]" : "text-[var(--text-secondary)]"}`}>
                     {achievement.detail}
                   </p>
                 </div>
