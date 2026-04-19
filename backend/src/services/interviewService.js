@@ -1,6 +1,7 @@
 const InterviewSession = require("../models/InterviewSession");
 const Problem = require("../models/Problem");
 const ApiError = require("../utils/apiError");
+const mongoose = require("mongoose");
 const { interviewLastNChats, interviewChatPageSize } = require("../config/env");
 const {
   formatConversationHistory,
@@ -1125,13 +1126,30 @@ async function saveCodeSnapshot({ userId, sessionId, code, language }) {
   return { success: true, snapshotCount: session.codeSnapshots.length };
 }
 
-async function getInterviewHistory({ userId, page = 1, limit = 10, status = "all" }) {
+async function getInterviewHistory({ userId, page = 1, limit = 10, status = "all", difficulty = "all" }) {
   const safePage = Math.max(1, Number(page) || 1);
   const safeLimit = Math.min(50, Math.max(1, Number(limit) || 10));
   const skip = (safePage - 1) * safeLimit;
 
   const filter = { userId };
   if (status !== "all") filter.status = status;
+
+  if (difficulty !== "all") {
+    const problemIds = await Problem.find({ difficulty })
+      .select("_id")
+      .lean();
+
+    if (!problemIds.length) {
+      return {
+        items: [],
+        total: 0,
+        page: safePage,
+        pages: 1,
+      };
+    }
+
+    filter.problemId = { $in: problemIds.map((problem) => problem._id) };
+  }
 
   const [sessions, total] = await Promise.all([
     InterviewSession.find(filter)
@@ -1180,16 +1198,72 @@ async function getInterviewHistory({ userId, page = 1, limit = 10, status = "all
 }
 
 async function getInterviewStats({ userId }) {
-  const [totalSessions, completed, avgScoreResult] = await Promise.all([
+  const objectUserId = new mongoose.Types.ObjectId(userId);
+
+  const [
+    totalSessions,
+    completed,
+    avgScoreResult,
+    avgScoreAllResult,
+    difficultyBreakdownRaw,
+  ] = await Promise.all([
     InterviewSession.countDocuments({ userId }),
     InterviewSession.countDocuments({ userId, status: "completed" }),
     InterviewSession.aggregate([
-      { $match: { userId: new (require("mongoose").Types.ObjectId)(userId), status: "completed" } },
+      { $match: { userId: objectUserId, status: "completed" } },
       { $group: { _id: null, avgScore: { $avg: "$scoring.totalScore" }, avgDuration: { $avg: "$duration" } } },
+    ]),
+    InterviewSession.aggregate([
+      { $match: { userId: objectUserId } },
+      { $group: { _id: null, avgScoreAll: { $avg: { $ifNull: ["$scoring.totalScore", 0] } } } },
+    ]),
+    InterviewSession.aggregate([
+      { $match: { userId: objectUserId } },
+      {
+        $lookup: {
+          from: "problems",
+          localField: "problemId",
+          foreignField: "_id",
+          as: "problem",
+        },
+      },
+      { $unwind: "$problem" },
+      {
+        $group: {
+          _id: "$problem.difficulty",
+          count: { $sum: 1 },
+          avgScore: {
+            $avg: {
+              $cond: [
+                { $eq: ["$status", "completed"] },
+                { $ifNull: ["$scoring.totalScore", 0] },
+                null,
+              ],
+            },
+          },
+        },
+      },
     ]),
   ]);
 
   const stats = avgScoreResult[0] || { avgScore: 0, avgDuration: 0 };
+  const allScoreStats = avgScoreAllResult[0] || { avgScoreAll: 0 };
+
+  const difficultyMap = {
+    Easy: { difficulty: "Easy", count: 0, averageScore: 0 },
+    Medium: { difficulty: "Medium", count: 0, averageScore: 0 },
+    Hard: { difficulty: "Hard", count: 0, averageScore: 0 },
+  };
+
+  (difficultyBreakdownRaw || []).forEach((row) => {
+    const key = row?._id;
+    if (!difficultyMap[key]) return;
+    difficultyMap[key] = {
+      difficulty: key,
+      count: Number(row.count || 0),
+      averageScore: Math.round(Number(row.avgScore || 0)),
+    };
+  });
 
   return {
     totalSessions,
@@ -1197,6 +1271,8 @@ async function getInterviewStats({ userId }) {
     abandoned: totalSessions - completed,
     successRate: totalSessions > 0 ? Math.round((completed / totalSessions) * 100) : 0,
     averageScore: Math.round(stats.avgScore || 0),
+    averageScoreAll: Math.round(allScoreStats.avgScoreAll || 0),
     averageDuration: Math.round(stats.avgDuration || 0),
+    difficultyBreakdown: [difficultyMap.Easy, difficultyMap.Medium, difficultyMap.Hard],
   };
 }

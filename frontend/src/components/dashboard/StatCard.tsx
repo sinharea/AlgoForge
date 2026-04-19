@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 type StatCardProps = {
   title: string;
   value: number;
-  icon: LucideIcon;
+  icon?: LucideIcon;
   tooltip: string;
   tone: "violet" | "emerald" | "amber" | "rose";
 };
@@ -54,7 +54,7 @@ export default function StatCard({ title, value, icon: Icon, tooltip, tone }: St
           </p>
         </div>
         <div className={`rounded-xl p-2.5 ${style.icon}`}>
-          <Icon className="h-5 w-5" />
+          {Icon && <Icon className="h-5 w-5" />}
         </div>
       </div>
     </motion.article>

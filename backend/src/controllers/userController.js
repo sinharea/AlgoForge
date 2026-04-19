@@ -1,6 +1,19 @@
 const asyncHandler = require("../utils/asyncHandler");
 const { getWeaknessReport } = require("../services/recommendationService");
-const { getHeatmapData, getTopicAnalytics } = require("../services/analyticsService");
+const {
+  getHeatmapData,
+  getTopicAnalytics,
+  getAttemptEfficiency,
+  getTopicProgress,
+  getAccuracyTrend,
+  getSolveSpeed,
+  getTopicErrors,
+  getTopicTrends,
+  getErrorPatterns,
+  getWeaknessComparison,
+  getDynamicMilestones,
+  generateInsights,
+} = require("../services/analyticsService");
 const UserProblemStatus = require("../models/UserProblemStatus");
 const ApiError = require("../utils/apiError");
 
@@ -79,4 +92,59 @@ module.exports = {
   toggleFavorite,
   getBookmarks,
   getProblemStatuses,
+  attemptEfficiency: asyncHandler(async (req, res) => {
+    const { topic, difficulty, range } = req.query;
+    const data = await getAttemptEfficiency(req.user._id, { topic, difficulty, range });
+    res.json(data);
+  }),
+  topicProgress: asyncHandler(async (req, res) => {
+    const { granularity, months } = req.query;
+    const data = await getTopicProgress(req.user._id, {
+      granularity: granularity || "weekly",
+      months: parseInt(months, 10) || 3,
+    });
+    res.json(data);
+  }),
+  accuracyTrend: asyncHandler(async (req, res) => {
+    const days = parseInt(req.query.days, 10) || 30;
+    const data = await getAccuracyTrend(req.user._id, { days });
+    res.json(data);
+  }),
+  solveSpeed: asyncHandler(async (req, res) => {
+    const months = parseInt(req.query.months, 10) || 6;
+    const data = await getSolveSpeed(req.user._id, { months });
+    res.json(data);
+  }),
+  topicErrors: asyncHandler(async (req, res) => {
+    const { topic } = req.query;
+    const data = await getTopicErrors(req.user._id, { topic });
+    res.json(data);
+  }),
+  topicTrends: asyncHandler(async (req, res) => {
+    const topics = req.query.topics ? req.query.topics.split(",") : [];
+    const weeks = parseInt(req.query.weeks, 10) || 12;
+    const data = await getTopicTrends(req.user._id, { topics, weeks });
+    res.json(data);
+  }),
+  errorPatterns: asyncHandler(async (req, res) => {
+    const data = await getErrorPatterns(req.user._id);
+    res.json(data);
+  }),
+  weaknessComparison: asyncHandler(async (req, res) => {
+    const data = await getWeaknessComparison(req.user._id);
+    res.json(data);
+  }),
+  milestones: asyncHandler(async (req, res) => {
+    const data = await getDynamicMilestones(req.user._id);
+    res.json(data);
+  }),
+  insights: asyncHandler(async (req, res) => {
+    const data = await generateInsights(req.user._id);
+    res.json(data);
+  }),
+  weaknessDetailed: asyncHandler(async (req, res) => {
+    const { getDetailedWeakness } = require("../services/recommendationService");
+    const data = await getDetailedWeakness(req.user._id);
+    res.json(data);
+  }),
 };

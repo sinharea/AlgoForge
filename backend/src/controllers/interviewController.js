@@ -89,6 +89,7 @@ const getHistory = asyncHandler(async (req, res) => {
     page: req.query.page,
     limit: req.query.limit,
     status: req.query.status,
+    difficulty: req.query.difficulty,
   });
 
   res.json(data);

@@ -41,6 +41,7 @@ const interviewHistoryQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(50).default(10),
   status: z.enum(["active", "completed", "abandoned", "all"]).default("all"),
+  difficulty: z.enum(["Easy", "Medium", "Hard", "all"]).default("all"),
 });
 
 module.exports = {

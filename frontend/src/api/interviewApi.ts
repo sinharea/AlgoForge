@@ -113,7 +113,13 @@ export type InterviewStats = {
   abandoned: number;
   successRate: number;
   averageScore: number;
+  averageScoreAll?: number;
   averageDuration: number;
+  difficultyBreakdown?: Array<{
+    difficulty: "Easy" | "Medium" | "Hard";
+    count: number;
+    averageScore: number;
+  }>;
 };
 
 export const interviewApi = {
@@ -127,7 +133,7 @@ export const interviewApi = {
   saveCode: (payload: { sessionId: string; code: string; language: string }) =>
     api.post("/interview/code-snapshot", payload),
   getById: (sessionId: string) => api.get<InterviewSessionResponse>(`/interview/${sessionId}`),
-  getHistory: (params?: { page?: number; limit?: number; status?: string }) =>
+  getHistory: (params?: { page?: number; limit?: number; status?: string; difficulty?: "Easy" | "Medium" | "Hard" | "all" }) =>
     api.get<{ items: InterviewHistoryItem[]; total: number; page: number; pages: number }>("/interview/history", { params }),
   getStats: () => api.get<InterviewStats>("/interview/stats"),
 };

@@ -7,6 +7,8 @@ export type RecommendedProblem = {
   difficulty: DifficultyKey;
   tags: string[];
   bookmarked?: boolean;
+  confidenceScore?: number;
+  recommendationTag?: "Fix Weakness" | "Level Up";
 };
 
 export type ActivityItem = {
@@ -28,7 +30,10 @@ export type DashboardMockData = {
   totalProblems: number;
   streakDays: number;
   byDifficulty: Record<DifficultyKey, number>;
+  byDifficultyTotals: Record<DifficultyKey, number>;
+  attemptingCount: number;
   byTopic: Record<string, number>;
+  byTopicTotals: Record<string, number>;
   recommendations: RecommendedProblem[];
   recentActivity: ActivityItem[];
   achievements: Achievement[];
@@ -44,6 +49,12 @@ export const dashboardMock: DashboardMockData = {
     Medium: 71,
     Hard: 24,
   },
+  byDifficultyTotals: {
+    Easy: 200,
+    Medium: 200,
+    Hard: 100,
+  },
+  attemptingCount: 36,
   byTopic: {
     Array: 52,
     "Two Pointers": 31,
@@ -54,6 +65,16 @@ export const dashboardMock: DashboardMockData = {
     Stack: 14,
     BinarySearch: 12,
   },
+  byTopicTotals: {
+    Array: 146,
+    "Two Pointers": 74,
+    "Dynamic Programming": 81,
+    Graph: 67,
+    Tree: 78,
+    Greedy: 52,
+    Stack: 44,
+    BinarySearch: 36,
+  },
   recommendations: [
     {
       id: "p1",
@@ -62,6 +83,8 @@ export const dashboardMock: DashboardMockData = {
       difficulty: "Medium",
       tags: ["Array", "Hashing"],
       bookmarked: true,
+      confidenceScore: 86,
+      recommendationTag: "Fix Weakness",
     },
     {
       id: "p2",
@@ -69,6 +92,8 @@ export const dashboardMock: DashboardMockData = {
       slug: "lru-cache",
       difficulty: "Hard",
       tags: ["Design", "Linked List"],
+      confidenceScore: 79,
+      recommendationTag: "Level Up",
     },
     {
       id: "p3",
@@ -76,6 +101,8 @@ export const dashboardMock: DashboardMockData = {
       slug: "subarray-sum-equals-k",
       difficulty: "Medium",
       tags: ["Prefix Sum", "Hash Map"],
+      confidenceScore: 84,
+      recommendationTag: "Fix Weakness",
     },
     {
       id: "p4",
@@ -83,6 +110,8 @@ export const dashboardMock: DashboardMockData = {
       slug: "valid-parentheses",
       difficulty: "Easy",
       tags: ["Stack", "String"],
+      confidenceScore: 76,
+      recommendationTag: "Level Up",
     },
     {
       id: "p5",
@@ -90,6 +119,8 @@ export const dashboardMock: DashboardMockData = {
       slug: "course-schedule",
       difficulty: "Medium",
       tags: ["Graph", "Topological Sort"],
+      confidenceScore: 82,
+      recommendationTag: "Fix Weakness",
     },
     {
       id: "p6",
@@ -97,6 +128,8 @@ export const dashboardMock: DashboardMockData = {
       slug: "trapping-rain-water",
       difficulty: "Hard",
       tags: ["Two Pointers", "Array"],
+      confidenceScore: 81,
+      recommendationTag: "Level Up",
     },
   ],
   recentActivity: [

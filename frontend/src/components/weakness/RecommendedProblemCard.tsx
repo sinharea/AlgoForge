@@ -5,6 +5,8 @@ type RecommendedProblemCardProps = {
   slug: string;
   difficulty: string;
   tags?: string[];
+  confidenceScore?: number;
+  recommendationTag?: "Fix Weakness" | "Level Up";
 };
 
 const difficultyClassMap: Record<string, string> = {
@@ -18,6 +20,8 @@ export default function RecommendedProblemCard({
   slug,
   difficulty,
   tags = [],
+  confidenceScore = 82,
+  recommendationTag = "Level Up",
 }: RecommendedProblemCardProps) {
   const difficultyClass = difficultyClassMap[difficulty] || "text-slate-300 bg-slate-500/15";
 
@@ -39,6 +43,19 @@ export default function RecommendedProblemCard({
             {tag}
           </span>
         ))}
+      </div>
+
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <span className="text-xs font-semibold text-[var(--accent-secondary)]">{confidenceScore}% match</span>
+        <span
+          className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+            recommendationTag === "Fix Weakness"
+              ? "bg-[#fde7cf] text-[#9b5c11]"
+              : "bg-[#dcf0e2] text-[#2b6c44]"
+          }`}
+        >
+          {recommendationTag}
+        </span>
       </div>
 
       <Link href={`/problems/${slug}`} className="mt-4 inline-flex text-sm font-medium text-[var(--accent-secondary)] hover:underline">

@@ -8,6 +8,11 @@ import { authApi } from "@/src/api/authApi";
 import { userApi } from "@/src/api/userApi";
 import WeakTopicCard from "@/src/components/weakness/WeakTopicCard";
 import RecommendedProblemCard from "@/src/components/weakness/RecommendedProblemCard";
+import SeverityMatrix from "@/src/components/weakness/SeverityMatrix";
+import TopicTrendChart from "@/src/components/weakness/TopicTrendChart";
+import ErrorPatternChart from "@/src/components/weakness/ErrorPatternChart";
+import WeaknessComparison from "@/src/components/weakness/WeaknessComparison";
+import PracticePlan from "@/src/components/weakness/PracticePlan";
 
 type TopicStat = {
   topic: string;
@@ -90,6 +95,7 @@ export default function WeaknessPage() {
   const weakTopics = report?.weak_topics || [];
   const strongTopics = report?.strong_topics || [];
   const recommendedProblems = report?.recommended_problems || [];
+  const weakTopicSet = new Set(weakTopics.map((item) => item.topic.trim().toLowerCase()));
 
   if (!ready || weaknessQuery.isLoading) {
     return (
@@ -196,6 +202,27 @@ export default function WeaknessPage() {
             </div>
           </section>
 
+          {/* Severity Matrix */}
+          <section className="mt-6">
+            <SeverityMatrix />
+          </section>
+
+          {/* Topic Trends & Error Patterns */}
+          <section className="mt-6 grid gap-6 lg:grid-cols-2">
+            <TopicTrendChart />
+            <ErrorPatternChart />
+          </section>
+
+          {/* Month-over-Month Comparison */}
+          <section className="mt-6">
+            <WeaknessComparison />
+          </section>
+
+          {/* ML Practice Plan */}
+          <section className="mt-6">
+            <PracticePlan />
+          </section>
+
           <section className="mt-6 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-5">
             <h2 className="text-lg font-semibold">Recommended Problems</h2>
             <p className="mt-1 text-sm text-[var(--text-secondary)]">
@@ -204,15 +231,25 @@ export default function WeaknessPage() {
 
             <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {recommendedProblems.length ? (
-                recommendedProblems.map((problem) => (
-                  <RecommendedProblemCard
-                    key={problem.id}
-                    title={problem.title}
-                    slug={problem.slug}
-                    difficulty={problem.difficulty}
-                    tags={problem.tags}
-                  />
-                ))
+                recommendedProblems.map((problem) => {
+                  const tags = Array.isArray(problem.tags) ? problem.tags : [];
+                  const topicMatch = tags.some((tag) => weakTopicSet.has(tag.trim().toLowerCase()));
+                  const normalizedDifficulty = String(problem.difficulty || "").trim().toLowerCase();
+                  const difficultyWeight = normalizedDifficulty === "hard" ? 12 : normalizedDifficulty === "medium" ? 10 : 8;
+                  const confidenceScore = Math.max(60, Math.min(94, 64 + (topicMatch ? 18 : 0) + difficultyWeight + Math.min(tags.length, 2)));
+
+                  return (
+                    <RecommendedProblemCard
+                      key={problem.id}
+                      title={problem.title}
+                      slug={problem.slug}
+                      difficulty={problem.difficulty}
+                      tags={tags}
+                      confidenceScore={confidenceScore}
+                      recommendationTag={topicMatch ? "Fix Weakness" : "Level Up"}
+                    />
+                  );
+                })
               ) : (
                 <p className="text-sm text-[var(--text-muted)]">No recommended problems available yet.</p>
               )}

@@ -11,6 +11,8 @@ type ProblemCardProps = {
 };
 
 export default function ProblemCard({ problem }: ProblemCardProps) {
+  const recommendationTag = problem.recommendationTag || "Level Up";
+
   return (
     <motion.article
       initial={{ opacity: 0, y: 10 }}
@@ -39,6 +41,21 @@ export default function ProblemCard({ problem }: ProblemCardProps) {
             {tag}
           </span>
         ))}
+      </div>
+
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <span className="text-xs font-semibold text-[var(--accent-secondary)]">
+          {problem.confidenceScore ?? 82}% match
+        </span>
+        <span
+          className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+            recommendationTag === "Fix Weakness"
+              ? "bg-[#fde7cf] text-[#9b5c11]"
+              : "bg-[#dcf0e2] text-[#2b6c44]"
+          }`}
+        >
+          {recommendationTag}
+        </span>
       </div>
 
       <div className="mt-4 flex items-center justify-between">
