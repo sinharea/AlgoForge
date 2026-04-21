@@ -101,7 +101,7 @@ export default function TopicTrendChart() {
                   border: "1px solid var(--border-color)",
                   borderRadius: "0.75rem",
                 }}
-                formatter={(val: number) => [`${val.toFixed(0)}%`]}
+                formatter={(val) => [`${Number(val ?? 0).toFixed(0)}%`]}
               />
               <Legend wrapperStyle={{ fontSize: "11px" }} />
               {topics.map((topic, idx) => (

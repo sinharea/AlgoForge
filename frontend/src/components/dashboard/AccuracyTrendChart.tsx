@@ -73,7 +73,7 @@ export default function AccuracyTrendChart() {
                   border: "1px solid var(--border-color)",
                   borderRadius: "0.75rem",
                 }}
-                formatter={(val: number) => [`${val}%`, "Accuracy"]}
+                formatter={(val) => [`${Number(val ?? 0)}%`, "Accuracy"]}
               />
               <Area type="monotone" dataKey="accuracy" stroke="#22c55e" fill="url(#accGrad)" strokeWidth={2} />
             </AreaChart>

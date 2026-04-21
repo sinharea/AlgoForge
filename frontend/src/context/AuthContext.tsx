@@ -1,9 +1,9 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
-import { getUser, getAccessToken, getRefreshToken, setAuthTokens, clearAuth } from "../utils/auth";
+import { getUser, getAccessToken, getRefreshToken, setAuthTokens, clearAuth, type User as StoredUser } from "../utils/auth";
 
-type User = { id: string; name: string; email: string; role: string; avatarUrl?: string } | null;
+type User = StoredUser | null;
 
 type AuthContextType = {
   user: User;

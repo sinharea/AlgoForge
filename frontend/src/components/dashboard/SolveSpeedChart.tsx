@@ -61,7 +61,7 @@ export default function SolveSpeedChart() {
                   border: "1px solid var(--border-color)",
                   borderRadius: "0.75rem",
                 }}
-                formatter={(val: number) => [`${val}s`]}
+                formatter={(val) => [`${Number(val ?? 0)}s`]}
               />
               <Legend wrapperStyle={{ fontSize: "11px" }} />
               <Bar dataKey="Easy" fill="#22c55e" radius={[4, 4, 0, 0]} />

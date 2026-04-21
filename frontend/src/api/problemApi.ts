@@ -48,7 +48,7 @@ export const problemApi = {
     api.get<ProblemEditorial>(`/problems/slug/${slug}/editorial`),
   getSimilarProblems: (slug: string) =>
     api.get<{ similar: SimilarProblem[] }>(`/problems/slug/${slug}/similar`),
-  submit: (payload: { problemId: string; language: string; code: string; contestId?: string }) =>
+  submit: (payload: { problemId: string; language: string; code: string; contestId?: string; timeTaken?: number }) =>
     api.post("/submissions", payload),
   run: (payload: { language: string; code: string; testCases: TestCase[] }) =>
     api.post<{ results: RunResult[] }>("/submissions/run", payload),

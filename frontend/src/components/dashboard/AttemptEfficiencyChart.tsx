@@ -132,10 +132,14 @@ export default function AttemptEfficiencyChart() {
                       borderRadius: "0.75rem",
                       fontSize: "0.8rem",
                     }}
-                    formatter={(value: number, _: string, entry: any) => [
-                      `${value}% (${entry.payload.attempts} attempt${entry.payload.attempts > 1 ? "s" : ""})`,
-                      entry.payload.fullTitle,
-                    ]}
+                    formatter={(value, _, entry) => {
+                      const attempts = Number((entry as any)?.payload?.attempts ?? 0);
+                      const title = (entry as any)?.payload?.fullTitle || "Problem";
+                      return [
+                        `${Number(value ?? 0)}% (${attempts} attempt${attempts > 1 ? "s" : ""})`,
+                        title,
+                      ];
+                    }}
                   />
                   <Bar dataKey="efficiency" radius={[6, 6, 0, 0]} animationDuration={700}>
                     {data.map((entry: any, idx: number) => (
@@ -169,10 +173,14 @@ export default function AttemptEfficiencyChart() {
                       borderRadius: "0.75rem",
                       fontSize: "0.8rem",
                     }}
-                    formatter={(value: number, _: string, entry: any) => [
-                      `${value}% (${entry.payload.attempts} attempt${entry.payload.attempts > 1 ? "s" : ""})`,
-                      entry.payload.fullTitle,
-                    ]}
+                    formatter={(value, _, entry) => {
+                      const attempts = Number((entry as any)?.payload?.attempts ?? 0);
+                      const title = (entry as any)?.payload?.fullTitle || "Problem";
+                      return [
+                        `${Number(value ?? 0)}% (${attempts} attempt${attempts > 1 ? "s" : ""})`,
+                        title,
+                      ];
+                    }}
                   />
                   <Line
                     type="linear"

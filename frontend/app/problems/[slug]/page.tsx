@@ -278,10 +278,11 @@ export default function ProblemDetailPage() {
         : { sessionId };
 
       const compareResponse = await interviewApi.compare(comparePayload);
+      const compareData = compareResponse.data;
 
       return {
-        sessionId,
-        ...compareResponse.data,
+        ...compareData,
+        sessionId: compareData.sessionId ?? sessionId,
       };
     },
     onSuccess: (data) => {
