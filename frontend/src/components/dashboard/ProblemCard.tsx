@@ -1,10 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Bookmark } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { DifficultyBadge } from "@/src/components/ui/Badge";
 import { RecommendedProblem } from "@/src/data/dashboardMock";
+import { userApi } from "@/src/api/userApi";
 
 type ProblemCardProps = {
   problem: RecommendedProblem;
@@ -12,6 +15,19 @@ type ProblemCardProps = {
 
 export default function ProblemCard({ problem }: ProblemCardProps) {
   const recommendationTag = problem.recommendationTag || "Level Up";
+  const [bookmarked, setBookmarked] = useState(problem.bookmarked ?? false);
+  const queryClient = useQueryClient();
+
+  const handleBookmark = async () => {
+    try {
+      await userApi.toggleBookmark(problem.id);
+      setBookmarked((prev) => !prev);
+      queryClient.invalidateQueries({ queryKey: ["problem-statuses-dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["problem-statuses"] });
+    } catch {
+      // silently fail
+    }
+  };
 
   return (
     <motion.article
@@ -26,9 +42,10 @@ export default function ProblemCard({ problem }: ProblemCardProps) {
         <button
           type="button"
           title="Bookmark"
+          onClick={handleBookmark}
           className="rounded-lg p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--bg-tertiary)] hover:text-[var(--accent-muted)]"
         >
-          <Bookmark className={`h-4 w-4 ${problem.bookmarked ? "fill-[#8b6a35] text-[#8b6a35]" : ""}`} />
+          <Bookmark className={`h-4 w-4 ${bookmarked ? "fill-[#8b6a35] text-[#8b6a35]" : ""}`} />
         </button>
       </div>
 

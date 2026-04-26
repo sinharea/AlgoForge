@@ -155,6 +155,24 @@ export default function DashboardPage() {
     retry: 1,
   });
 
+  const statusesQuery = useQuery({
+    queryKey: ["problem-statuses-dashboard"],
+    queryFn: async () => (await userApi.problemStatuses()).data as Array<{
+      problemId: string;
+      isBookmarked: boolean;
+    }>,
+    staleTime: 1000 * 60 * 2,
+    retry: false,
+  });
+
+  const bookmarkedSet = useMemo(() => {
+    const set = new Set<string>();
+    (statusesQuery.data || []).forEach((s) => {
+      if (s.isBookmarked) set.add(s.problemId);
+    });
+    return set;
+  }, [statusesQuery.data]);
+
   const loading =
     dashboardQuery.isLoading || recommendationsQuery.isLoading || recentQuery.isLoading;
 
@@ -175,6 +193,7 @@ export default function DashboardPage() {
         slug: item.slug || "",
         difficulty: normalizeDifficulty(item.difficulty),
         tags: item.tags || [],
+        bookmarked: bookmarkedSet.has(String(item._id || item.id)),
         confidenceScore: Number.isFinite(Number(item.confidenceScore))
           ? Number(item.confidenceScore)
           : (() => {
@@ -273,7 +292,7 @@ export default function DashboardPage() {
           : [],
       achievements,
     };
-  }, [dashboardQuery.data, recommendationsQuery.data, recentQuery.data, profileQuery.data, user?.name]);
+  }, [dashboardQuery.data, recommendationsQuery.data, recentQuery.data, profileQuery.data, user?.name, bookmarkedSet]);
 
   const difficultyBreakdown = useMemo(
     () => [

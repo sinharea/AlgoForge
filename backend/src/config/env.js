@@ -71,4 +71,5 @@ module.exports = {
   dockerImageRust: process.env.DOCKER_IMAGE_RUST || "rust:1.74-alpine",
   bcryptSaltRounds: toPositiveInt(process.env.BCRYPT_SALT_ROUNDS, 12),
   maxOutputSize: toPositiveInt(process.env.MAX_OUTPUT_SIZE, 65536),
+  mlServiceUrl: process.env.ML_SERVICE_URL || "http://localhost:5050",
 };

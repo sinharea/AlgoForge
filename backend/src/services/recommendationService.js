@@ -4,6 +4,7 @@ const UserTopicStats = require("../models/UserTopicStats");
 const UserProblemStatus = require("../models/UserProblemStatus");
 const Submission = require("../models/Submission");
 const redis = require("../config/redis");
+const { predictSolveProbability } = require("./mlClient");
 
 const formatTopicRows = (rows = []) =>
   rows.map((row) => ({
@@ -136,8 +137,10 @@ const getUserDashboardStats = async (userId) => {
   };
 };
 
-const getRecommendations = async (userId) => {
-  const cacheKey = `recommendations:${userId}`;
+const getRecommendations = async (userId, modificationHints = null) => {
+  const cacheKey = modificationHints
+    ? `recommendations:${userId}:mod:${stableHash(JSON.stringify(modificationHints))}`
+    : `recommendations:${userId}`;
   const cached = await redis.get(cacheKey);
   if (cached) return JSON.parse(cached);
 
@@ -145,7 +148,7 @@ const getRecommendations = async (userId) => {
   const weakTopicRows = (analytics || [])
     .filter((t) => t.totalAttempts >= 2)
     .sort((a, b) => a.accuracy - b.accuracy)
-    .slice(0, 3);
+    .slice(0, 5);
 
   const weakTopics = weakTopicRows.map((t) => t.topic);
   const weakTopicMap = weakTopicRows.reduce((acc, row) => {
@@ -156,71 +159,195 @@ const getRecommendations = async (userId) => {
     return acc;
   }, {});
 
-  // Use UserProblemStatus to filter solved problems efficiently
+  // Build per-topic accuracy map (0-1) for ML service
+  const topicAccuracies = {};
+  for (const stat of analytics) {
+    topicAccuracies[stat.topic] = (stat.accuracy || 0) / 100;
+  }
+
   const solvedProblemIds = (await UserProblemStatus.find({ userId, status: "solved" })
     .select("problemId")
     .lean()
   ).map((s) => s.problemId);
 
   const totalSolved = solvedProblemIds.length;
-  const targetDifficulty = totalSolved < 10 ? "Easy" : totalSolved < 40 ? "Medium" : "Hard";
+
+  // Apply modification hints if provided
+  let targetDifficulty = totalSolved < 10 ? "Easy" : totalSolved < 40 ? "Medium" : "Hard";
+  let boostTopics = [];
+  if (modificationHints) {
+    if (modificationHints.difficulty) {
+      targetDifficulty = normalizeDifficultyKey(modificationHints.difficulty) || targetDifficulty;
+    }
+    if (modificationHints.focusTopics && modificationHints.focusTopics.length) {
+      boostTopics = modificationHints.focusTopics;
+    }
+  }
 
   const query = {
     _id: { $nin: solvedProblemIds },
-    difficulty: targetDifficulty,
-    ...(weakTopics.length ? { tags: { $in: weakTopics } } : {}),
+    ...(boostTopics.length
+      ? { tags: { $in: boostTopics } }
+      : weakTopics.length
+        ? { tags: { $in: weakTopics } }
+        : {}),
   };
 
-  let suggestions = await Problem.find(query)
+  // Fetch more candidates for ML scoring (wider pool)
+  let candidates = await Problem.find(query)
     .select("title slug difficulty tags difficultyScore questionNumber")
-    .limit(15)
+    .limit(50)
     .lean();
 
-  if (!suggestions.length) {
-    suggestions = await Problem.find({
-      _id: { $nin: solvedProblemIds },
+  if (candidates.length < 15) {
+    const existingIds = candidates.map((c) => c._id);
+    const fallback = await Problem.find({
+      _id: { $nin: [...solvedProblemIds, ...existingIds] },
     })
       .select("title slug difficulty tags difficultyScore questionNumber")
-      .limit(15)
+      .limit(50 - candidates.length)
       .lean();
+    candidates = [...candidates, ...fallback];
   }
 
-  const normalizedTargetDifficulty = normalizeDifficultyKey(targetDifficulty);
+  // Compute global accuracy for user
+  const globalAccuracy = analytics.length
+    ? analytics.reduce((s, t) => s + t.accuracy, 0) / analytics.length / 100
+    : 0.5;
 
-  const enrichedSuggestions = suggestions.map((problem) => {
+  // Recent accuracy from recent results across all topics
+  const allRecent = analytics.flatMap((t) => t.recentResults || []);
+  const recentAccuracy = allRecent.length
+    ? allRecent.filter(Boolean).length / allRecent.length
+    : globalAccuracy;
+
+  // --- Try ML scoring via microservice ---
+  const userFeatures = {
+    global_accuracy: globalAccuracy,
+    topic_accuracies: topicAccuracies,
+    total_solved: totalSolved,
+    recent_accuracy: recentAccuracy,
+    comfort_level: targetDifficulty,
+  };
+
+  // Get prior attempt counts for candidate problems (0 for never-attempted)
+  const candidateIds = candidates.map((c) => c._id);
+  const priorAttempts = await UserProblemStatus.find({
+    userId,
+    problemId: { $in: candidateIds },
+    status: "attempted",
+  }).select("problemId totalAttempts").lean();
+  const attemptMap = {};
+  for (const pa of priorAttempts) {
+    attemptMap[String(pa.problemId)] = pa.totalAttempts || 0;
+  }
+
+  const mlProblems = candidates.map((p) => ({
+    problem_id: String(p._id),
+    difficulty: p.difficulty,
+    difficulty_score: p.difficultyScore || 5,
+    tags: p.tags || [],
+    attempt_count: attemptMap[String(p._id)] || 0,
+  }));
+
+  const mlPredictions = await predictSolveProbability(userFeatures, mlProblems);
+  const pSolveMap = {};
+  if (mlPredictions) {
+    for (const pred of mlPredictions) {
+      pSolveMap[pred.problem_id] = pred.p_solve;
+    }
+  }
+
+  const useML = mlPredictions !== null;
+
+  // --- Score each candidate: S(u,p) = 0.55*P_solve + 0.35*ΔSkill + 0.10*N ---
+  const enrichedSuggestions = candidates.map((problem) => {
+    const pid = String(problem._id);
     const normalizedTags = (problem.tags || []).map(normalizeTopicKey);
     const matchingWeakTopics = normalizedTags.filter((tag) => weakTopicMap[tag]);
-
     const overlapCount = matchingWeakTopics.length;
-    const weakTopicAvgGap = overlapCount
-      ? matchingWeakTopics.reduce((sum, tag) => sum + (100 - weakTopicMap[tag].accuracy), 0) / overlapCount
-      : 0;
 
-    const weaknessComponent = Math.round((weakTopicAvgGap / 100) * 18);
-    const overlapComponent = overlapCount * 8;
-    const difficultyComponent =
-      normalizeDifficultyKey(problem.difficulty) === normalizedTargetDifficulty ? 10 : -4;
-    const qualityComponent = Math.min(Number(problem.difficultyScore || 0), 10) / 2;
-    const spreadComponent = stableHash(problem._id || problem.slug || problem.title) % 7;
+    if (useML) {
+      // P_solve from ML model
+      const pSolve = pSolveMap[pid] ?? 0.5;
 
-    const confidenceScore = clampNumber(
-      Math.round(54 + weaknessComponent + overlapComponent + difficultyComponent + qualityComponent + spreadComponent),
-      55,
-      96
-    );
+      // ΔSkill: expected skill gain from solving this problem
+      let deltaSkill = 0;
+      if (matchingWeakTopics.length > 0) {
+        deltaSkill = matchingWeakTopics.reduce((sum, tag) => {
+          const acc = weakTopicMap[tag] ? weakTopicMap[tag].accuracy / 100 : 0.5;
+          return sum + (1 - acc);
+        }, 0) / Math.max(Object.keys(weakTopicMap).length, 1);
+      }
+      deltaSkill = clampNumber(deltaSkill, 0, 1);
 
-    return {
-      ...problem,
-      confidenceScore,
-      recommendationTag: overlapCount > 0 ? "Fix Weakness" : "Level Up",
-      matchedWeakTopics: matchingWeakTopics.slice(0, 2),
-    };
+      // N(u,p): novelty / anti-repetition
+      const unseenTopicRatio = normalizedTags.length
+        ? normalizedTags.filter((t) => !topicAccuracies[t] || topicAccuracies[t] < 0.05).length / normalizedTags.length
+        : 0;
+      const spreadVal = (stableHash(pid) % 100) / 100;
+      const novelty = clampNumber(unseenTopicRatio * 0.6 + spreadVal * 0.4, 0, 1);
+
+      // Boost topics from modification hints
+      let modBoost = 0;
+      if (boostTopics.length) {
+        const boostMatch = normalizedTags.filter((t) =>
+          boostTopics.some((bt) => normalizeTopicKey(bt) === t)
+        ).length;
+        modBoost = boostMatch > 0 ? 0.1 : 0;
+      }
+
+      const score = 0.55 * pSolve + 0.35 * deltaSkill + 0.10 * novelty + modBoost;
+      const confidenceScore = clampNumber(Math.round(score * 100), 10, 99);
+
+      return {
+        ...problem,
+        confidenceScore,
+        pSolve: Math.round(pSolve * 100),
+        deltaSkill: Math.round(deltaSkill * 100),
+        novelty: Math.round(novelty * 100),
+        recommendationTag: overlapCount > 0 ? "Fix Weakness" : "Level Up",
+        matchedWeakTopics: matchingWeakTopics.slice(0, 2),
+        modelVersion: "v2-ml",
+      };
+    } else {
+      // Heuristic fallback (original logic)
+      const weakTopicAvgGap = overlapCount
+        ? matchingWeakTopics.reduce((sum, tag) => sum + (100 - weakTopicMap[tag].accuracy), 0) / overlapCount
+        : 0;
+
+      const weaknessComponent = Math.round((weakTopicAvgGap / 100) * 18);
+      const overlapComponent = overlapCount * 8;
+      const normalizedTargetDifficulty = normalizeDifficultyKey(targetDifficulty);
+      const difficultyComponent =
+        normalizeDifficultyKey(problem.difficulty) === normalizedTargetDifficulty ? 10 : -4;
+      const qualityComponent = Math.min(Number(problem.difficultyScore || 0), 10) / 2;
+      const spreadComponent = stableHash(pid) % 7;
+
+      const confidenceScore = clampNumber(
+        Math.round(54 + weaknessComponent + overlapComponent + difficultyComponent + qualityComponent + spreadComponent),
+        55,
+        96
+      );
+
+      return {
+        ...problem,
+        confidenceScore,
+        recommendationTag: overlapCount > 0 ? "Fix Weakness" : "Level Up",
+        matchedWeakTopics: matchingWeakTopics.slice(0, 2),
+        modelVersion: "v1-heuristic",
+      };
+    }
   });
+
+  // Sort by score descending, take top 15
+  enrichedSuggestions.sort((a, b) => b.confidenceScore - a.confidenceScore);
 
   const payload = {
     weakTopics,
     targetDifficulty,
-    suggestions: enrichedSuggestions,
+    modelVersion: useML ? "v2-ml" : "v1-heuristic",
+    suggestions: enrichedSuggestions.slice(0, 15),
   };
 
   await redis.set(cacheKey, JSON.stringify(payload), "EX", 60);
@@ -241,19 +368,21 @@ const getWeaknessReport = async (userId) => {
     };
   }
 
-  const weakTopics = normalizedStats
-    .filter((row) => row.attempts >= 2)
-    .sort((a, b) => a.accuracy - b.accuracy || b.attempts - a.attempts)
-    .slice(0, 5);
-
-  const fallbackWeak = !weakTopics.length
-    ? normalizedStats.slice(0, Math.min(3, normalizedStats.length))
-    : weakTopics;
-
   const strongTopics = normalizedStats
     .filter((row) => row.attempts >= 2 && row.accuracy >= 70)
     .sort((a, b) => b.accuracy - a.accuracy || b.attempts - a.attempts)
     .slice(0, 5);
+
+  const strongTopicNames = new Set(strongTopics.map((row) => row.topic));
+
+  const weakTopics = normalizedStats
+    .filter((row) => row.attempts >= 2 && !strongTopicNames.has(row.topic))
+    .sort((a, b) => a.accuracy - b.accuracy || b.attempts - a.attempts)
+    .slice(0, 5);
+
+  const fallbackWeak = !weakTopics.length
+    ? normalizedStats.filter((row) => !strongTopicNames.has(row.topic)).slice(0, Math.min(3, normalizedStats.length))
+    : weakTopics;
 
   const weakTopicNames = fallbackWeak.map((row) => row.topic);
 
@@ -453,9 +582,42 @@ const getDetailedWeakness = async (userId) => {
   };
 };
 
+/**
+ * Parse a user's free-text modification request into structured hints.
+ * e.g. "focus on graphs and trees, easier problems" → { focusTopics: ["Graphs","Trees"], difficulty: "Easy" }
+ */
+const parseModificationHints = (text) => {
+  if (!text || typeof text !== "string") return {};
+  const lower = text.toLowerCase();
+
+  const hints = {};
+
+  // Detect difficulty preference
+  if (/\beasier\b|\beasy\b/.test(lower)) hints.difficulty = "Easy";
+  else if (/\bharder\b|\bhard\b|\bchalleng/.test(lower)) hints.difficulty = "Hard";
+  else if (/\bmedium\b/.test(lower)) hints.difficulty = "Medium";
+
+  // Detect topic preferences — match known tags
+  const knownTopics = [
+    "Arrays", "Strings", "Dynamic Programming", "Graphs", "Trees",
+    "BFS/DFS", "BFS", "DFS", "Sorting", "Binary Search", "Hash Table",
+    "Linked List", "Stack", "Queue", "Greedy", "Recursion", "Math",
+  ];
+  const focusTopics = knownTopics.filter((t) => lower.includes(t.toLowerCase()));
+  // Normalize BFS/DFS
+  if (focusTopics.includes("BFS") || focusTopics.includes("DFS")) {
+    if (!focusTopics.includes("BFS/DFS")) focusTopics.push("BFS/DFS");
+  }
+  const uniqueTopics = [...new Set(focusTopics.filter((t) => t !== "BFS" && t !== "DFS"))];
+  if (uniqueTopics.length) hints.focusTopics = uniqueTopics;
+
+  return hints;
+};
+
 module.exports = {
   getUserDashboardStats,
   getRecommendations,
   getWeaknessReport,
   getDetailedWeakness,
+  parseModificationHints,
 };

@@ -23,4 +23,6 @@ export const userApi = {
   weaknessDetailed: () => api.get("/user/weakness-detailed"),
   recFeedback: (problemId: string, event: string) =>
     api.post("/recommendations/feedback", { problemId, event }),
+  modifyRecommendations: (modification: string) =>
+    api.post("/recommendations/modify", { modification }),
 };

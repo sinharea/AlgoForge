@@ -3,6 +3,7 @@ const auth = require("../middleware/auth");
 const {
   getMyRecommendations,
   getDashboardStats,
+  modifyRecommendations,
 } = require("../controllers/recommendationController");
 const asyncHandler = require("../utils/asyncHandler");
 const RecFeedback = require("../models/RecFeedback");
@@ -11,6 +12,7 @@ const router = express.Router();
 
 router.get("/", auth, getMyRecommendations);
 router.get("/dashboard", auth, getDashboardStats);
+router.post("/modify", auth, modifyRecommendations);
 
 router.post(
   "/feedback",
@@ -22,6 +24,8 @@ router.post(
     const validEvents = ["impression", "click", "attempt", "solve", "skip"];
     if (!validEvents.includes(event)) return res.status(400).json({ error: "Invalid event" });
 
+    const modelVersion = req.body.modelVersion || "v2-ml";
+
     const eventFieldMap = {
       impression: "impressionAt",
       click: "clickedAt",
@@ -31,9 +35,9 @@ router.post(
     };
 
     await RecFeedback.findOneAndUpdate(
-      { userId: req.user._id, problemId, modelVersion: "v1-heuristic" },
+      { userId: req.user._id, problemId, modelVersion },
       {
-        $setOnInsert: { userId: req.user._id, problemId, modelVersion: "v1-heuristic" },
+        $setOnInsert: { userId: req.user._id, problemId, modelVersion },
         $set: { [eventFieldMap[event]]: new Date() },
         ...(event === "attempt" ? { $inc: { attemptCount: 1 } } : {}),
         ...(event === "solve" ? { $set: { outcome: 1.0, [eventFieldMap[event]]: new Date() } } : {}),

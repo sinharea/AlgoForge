@@ -230,7 +230,7 @@ export default function ProblemsPage() {
   const favoriteSet = useMemo(() => {
     const set = new Set(favoriteIds);
     (statusesQuery.data || []).forEach((s) => {
-      if (s.isFavorited) set.add(s.problemId);
+      if (s.isFavorited || s.isBookmarked) set.add(s.problemId);
     });
     return set;
   }, [favoriteIds, statusesQuery.data]);
