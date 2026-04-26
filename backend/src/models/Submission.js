@@ -39,6 +39,27 @@ const submissionSchema = new mongoose.Schema({
     expectedOutput: String,
     actualOutput: String,
   },
+  aiAdversarialResult: {
+    testCases: [
+      {
+        index: Number,
+        input: String,
+        expectedOutput: String,
+        reason: String,
+      },
+    ],
+    executionResults: {
+      verdict: String,
+      passedCount: Number,
+      totalCount: Number,
+      failedTestCase: Number,
+      expectedOutput: String,
+      actualOutput: String,
+      runtime: Number,
+      stderr: String,
+    },
+    createdAt: Date,
+  },
   status: {
     type: String,
     enum: Object.values(SUBMISSION_STATUS),

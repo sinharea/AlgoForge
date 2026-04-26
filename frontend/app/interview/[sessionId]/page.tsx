@@ -32,6 +32,7 @@ import {
   InterviewHistoryItem,
   InterviewMessage,
   InterviewScoring,
+  AdversarialTestResult,
 } from "@/src/api/interviewApi";
 import ChatBubble from "@/src/components/interview/ChatBubble";
 import MessageInput from "@/src/components/interview/MessageInput";
@@ -255,6 +256,8 @@ export default function InterviewPage() {
   const [isHistoryScoreModalOpen, setIsHistoryScoreModalOpen] = useState(false);
   const [historyScoreSessionId, setHistoryScoreSessionId] = useState<string | null>(null);
   const [isEndScoreModalOpen, setIsEndScoreModalOpen] = useState(false);
+  const [adversarialResults, setAdversarialResults] = useState<AdversarialTestResult | null>(null);
+  const [isTestCaseModalOpen, setIsTestCaseModalOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const lastSpokenInterviewerMessageRef = useRef<string>("");
 
@@ -357,6 +360,28 @@ export default function InterviewPage() {
     },
   });
 
+  const testCaseMutation = useMutation({
+    mutationFn: async () =>
+      (await interviewApi.generateTestCases({ sessionId, userCode: codeValue, language: codeLang })).data,
+    onSuccess: (data) => {
+      setAdversarialResults(data);
+      setIsTestCaseModalOpen(true);
+      if (data.executionResults) {
+        const { passedCount, totalCount } = data.executionResults;
+        if (passedCount === totalCount) {
+          toast.success(`All ${totalCount} AI test cases passed!`);
+        } else {
+          toast.error(`Failed ${totalCount - passedCount} of ${totalCount} AI test cases`);
+        }
+      } else {
+        toast("AI test cases generated — review them manually", { icon: "🧪" });
+      }
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.error?.message || "Failed to generate test cases");
+    },
+  });
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, respondMutation.isPending]);
@@ -384,19 +409,20 @@ export default function InterviewPage() {
   }, []);
 
   useEffect(() => {
-    if (!isCompareModalOpen && !isHistoryScoreModalOpen && !isEndScoreModalOpen) return;
+    if (!isCompareModalOpen && !isHistoryScoreModalOpen && !isEndScoreModalOpen && !isTestCaseModalOpen) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setIsCompareModalOpen(false);
         setIsHistoryScoreModalOpen(false);
         setIsEndScoreModalOpen(false);
+        setIsTestCaseModalOpen(false);
       }
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isCompareModalOpen, isHistoryScoreModalOpen, isEndScoreModalOpen]);
+  }, [isCompareModalOpen, isHistoryScoreModalOpen, isEndScoreModalOpen, isTestCaseModalOpen]);
 
   const problem = sessionQuery.data?.problem;
   const isActive = sessionStatus === "active";
@@ -625,6 +651,24 @@ export default function InterviewPage() {
                       <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Comparing...</>
                     ) : (
                       <><Scale className="h-3.5 w-3.5" /> Compare</>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary text-xs"
+                    disabled={testCaseMutation.isPending || !codeValue.trim()}
+                    onClick={() => {
+                      if (!codeValue.trim()) {
+                        toast.error("Write some code first, then generate test cases");
+                        return;
+                      }
+                      testCaseMutation.mutate();
+                    }}
+                  >
+                    {testCaseMutation.isPending ? (
+                      <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Testing...</>
+                    ) : (
+                      <><Target className="h-3.5 w-3.5" /> Test My Code</>
                     )}
                   </button>
                   {!showEndConfirm ? (
@@ -965,6 +1009,122 @@ export default function InterviewPage() {
                   Close
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Test Case Results Modal */}
+      {isTestCaseModalOpen && adversarialResults && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div
+            className="relative mx-4 max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setIsTestCaseModalOpen(false)}
+              className="absolute right-4 top-4 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <div className="mb-4 flex items-center gap-3">
+              <Target className="h-5 w-5 text-[var(--accent-secondary)]" />
+              <h3 className="text-lg font-semibold text-[var(--text-primary)]">
+                AI-Generated Test Cases
+              </h3>
+            </div>
+
+            {adversarialResults.executionResults && (
+              <div className={clsx(
+                "mb-4 rounded-lg border p-3 text-sm font-medium",
+                adversarialResults.executionResults.passedCount === adversarialResults.executionResults.totalCount
+                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                  : "border-rose-500/30 bg-rose-500/10 text-rose-300"
+              )}>
+                Verdict: {adversarialResults.executionResults.verdict} — Passed{" "}
+                {adversarialResults.executionResults.passedCount}/{adversarialResults.executionResults.totalCount} test cases
+                {adversarialResults.executionResults.runtime > 0 && (
+                  <span className="ml-2 text-[var(--text-muted)]">
+                    ({adversarialResults.executionResults.runtime}ms)
+                  </span>
+                )}
+              </div>
+            )}
+
+            {adversarialResults.message && (
+              <div className="mb-4 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-200">
+                {adversarialResults.message}
+              </div>
+            )}
+
+            <div className="space-y-3">
+              {adversarialResults.testCases.map((tc, i) => {
+                const failed = adversarialResults.executionResults?.failedTestCase === tc.index;
+                return (
+                  <div
+                    key={i}
+                    className={clsx(
+                      "rounded-lg border p-3",
+                      failed
+                        ? "border-rose-500/30 bg-rose-500/5"
+                        : "border-[var(--border-color)] bg-[var(--bg-primary)]"
+                    )}
+                  >
+                    <div className="mb-1 flex items-center justify-between">
+                      <span className="text-xs font-semibold text-[var(--text-muted)]">
+                        Test #{tc.index}
+                      </span>
+                      {adversarialResults.executionResults && (
+                        <span className={clsx(
+                          "text-xs font-medium",
+                          failed ? "text-rose-400" : tc.index < (adversarialResults.executionResults.failedTestCase || Infinity) ? "text-emerald-400" : "text-[var(--text-muted)]"
+                        )}>
+                          {failed ? "✗ Failed" : tc.index < (adversarialResults.executionResults.failedTestCase || Infinity) ? "✓ Passed" : "—"}
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <span className="text-[var(--text-muted)]">Input:</span>
+                        <pre className="mt-0.5 rounded bg-black/30 p-1.5 text-[var(--text-primary)] whitespace-pre-wrap break-all">
+                          {tc.input || "(empty)"}
+                        </pre>
+                      </div>
+                      <div>
+                        <span className="text-[var(--text-muted)]">Expected:</span>
+                        <pre className="mt-0.5 rounded bg-black/30 p-1.5 text-[var(--text-primary)] whitespace-pre-wrap break-all">
+                          {tc.expectedOutput || "(empty)"}
+                        </pre>
+                      </div>
+                    </div>
+                    {failed && adversarialResults.executionResults?.actualOutput && (
+                      <div className="mt-2 text-xs">
+                        <span className="text-rose-400">Your output:</span>
+                        <pre className="mt-0.5 rounded bg-rose-500/10 p-1.5 text-rose-200 whitespace-pre-wrap break-all">
+                          {adversarialResults.executionResults.actualOutput}
+                        </pre>
+                      </div>
+                    )}
+                    {tc.reason && (
+                      <p className="mt-1.5 text-[11px] text-[var(--text-muted)] italic">
+                        Why: {tc.reason}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsTestCaseModalOpen(false)}
+                className="btn btn-ghost"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

@@ -3,10 +3,12 @@ const Problem = require("../models/Problem");
 const ApiError = require("../utils/apiError");
 const mongoose = require("mongoose");
 const { interviewLastNChats, interviewChatPageSize } = require("../config/env");
+const { judgeSubmission } = require("./executionService");
 const {
   formatConversationHistory,
   generateInterviewerMessage,
   generateComplexityComparison,
+  generateAdversarialTestCases,
 } = require("./interviewLlmService");
 
 const STUCK_PATTERN = /\b(stuck|hint|help|confused|no idea|don't know|dont know|unclear)\b/i;
@@ -987,10 +989,72 @@ const getInterviewSessionMessages = async ({ userId, sessionId, beforeIndex, lim
   };
 };
 
+const generateAndRunAdversarialTests = async ({ userId, sessionId, userCode, language }) => {
+  const session = await InterviewSession.findById(sessionId).populate(
+    "problemId",
+    "title slug difficulty tags description constraints sampleTestCases"
+  );
+
+  if (!session) throw ApiError.notFound("Interview session not found");
+  if (String(session.userId) !== String(userId)) throw ApiError.forbidden("Not your session");
+  if (!session.problemId) throw ApiError.notFound("Problem not found for this session");
+
+  const code = String(userCode || "").trim();
+  if (!code) throw ApiError.badRequest("User code is required");
+
+  const problemStatement = formatProblemForComplexityComparison(session.problemId);
+
+  const testCases = await generateAdversarialTestCases({
+    problemStatement,
+    userCode: code,
+    language,
+  });
+
+  const validTests = testCases.filter((tc) => tc.input && tc.expectedOutput);
+
+  if (validTests.length === 0) {
+    return {
+      sessionId,
+      testCases: testCases.map((tc, i) => ({ index: i + 1, ...tc })),
+      executionResults: null,
+      message: "AI generated test cases but could not determine expected outputs. Review the test cases manually.",
+    };
+  }
+
+  const results = await judgeSubmission({
+    language,
+    code,
+    testCases: validTests,
+    timeLimit: 3000,
+    memoryLimit: 256,
+  });
+
+  return {
+    sessionId,
+    testCases: validTests.map((tc, i) => ({
+      index: i + 1,
+      input: tc.input,
+      expectedOutput: tc.expectedOutput,
+      reason: tc.reason,
+    })),
+    executionResults: {
+      verdict: results.verdict,
+      passedCount: results.passedCount,
+      totalCount: results.totalCount,
+      failedTestCase: results.failedTestCase || null,
+      expectedOutput: results.expectedOutput || null,
+      actualOutput: results.actualOutput || null,
+      runtime: results.runtime,
+      stderr: results.stderr || null,
+    },
+  };
+};
+
 module.exports = {
   startInterviewSession,
   respondInterviewSession,
   compareInterviewSessionComplexity,
+  generateAndRunAdversarialTests,
   getInterviewSession,
   getInterviewSessionMessages,
   endInterviewSession,

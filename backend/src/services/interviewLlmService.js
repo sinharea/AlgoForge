@@ -456,17 +456,35 @@ const parseJsonObject = (value) => {
   const text = String(value || "").trim();
   if (!text) return null;
 
+  const withoutFence = text
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+
   try {
-    return JSON.parse(text);
+    return JSON.parse(withoutFence);
   } catch {
-    const first = text.indexOf("{");
-    const last = text.lastIndexOf("}");
-    if (first === -1 || last <= first) return null;
-    try {
-      return JSON.parse(text.slice(first, last + 1));
-    } catch {
-      return null;
+    const firstObj = withoutFence.indexOf("{");
+    const lastObj = withoutFence.lastIndexOf("}");
+    if (firstObj !== -1 && lastObj > firstObj) {
+      try {
+        return JSON.parse(withoutFence.slice(firstObj, lastObj + 1));
+      } catch {
+        // ignore and continue
+      }
     }
+
+    const firstArr = withoutFence.indexOf("[");
+    const lastArr = withoutFence.lastIndexOf("]");
+    if (firstArr !== -1 && lastArr > firstArr) {
+      try {
+        return JSON.parse(withoutFence.slice(firstArr, lastArr + 1));
+      } catch {
+        return null;
+      }
+    }
+
+    return null;
   }
 };
 
@@ -676,9 +694,101 @@ const generateComplexityComparison = async ({
   return fallback;
 };
 
+// ---------------------------------------------------------------------------
+// Adversarial Test Case Generation
+// ---------------------------------------------------------------------------
+
+const buildAdversarialTestCasePrompt = ({ problemStatement, userCode, language }) => {
+  return `You are an expert competitive programming test designer. Given a problem and a user's code, generate test cases where the user's code is likely to FAIL.
+
+Analyze the code for:
+- Off-by-one errors
+- Missing edge cases (empty input, single element, max constraints)
+- Integer overflow possibilities
+- Incorrect handling of duplicates, negatives, or zeros
+- Wrong algorithm that passes simple cases but fails corner cases
+- Time complexity issues with large inputs
+
+PROBLEM:
+${problemStatement}
+
+USER CODE (${language}):
+${userCode}
+
+Generate exactly 5 test cases. For each, provide:
+- input: the stdin input
+- expectedOutput: the correct output for this input
+- reason: why this test case might break the user's code
+
+Respond ONLY with valid JSON array:
+[
+  {"input": "...", "expectedOutput": "...", "reason": "..."},
+  ...
+]`;
+};
+
+const generateAdversarialTestCases = async ({ problemStatement, userCode, language }) => {
+  const fallback = [
+    { input: "", expectedOutput: "", reason: "Could not generate adversarial test cases." },
+  ];
+
+  if (!openaiApiKey && !geminiApiKey) {
+    return fallback;
+  }
+
+  const prompt = buildAdversarialTestCasePrompt({
+    problemStatement: clampText(problemStatement, 2600),
+    userCode: clampText(userCode, 7800),
+    language,
+  });
+
+  const providerErrors = [];
+
+  if (openaiApiKey) {
+    try {
+      const output = await generateWithOpenAi(prompt, { maxTokens: 800 });
+      const parsed = parseJsonObject(output);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.map((tc) => ({
+          input: String(tc.input ?? ""),
+          expectedOutput: String(tc.expectedOutput ?? ""),
+          reason: String(tc.reason ?? ""),
+        }));
+      }
+      providerErrors.push("OpenAI returned non-array test case output");
+    } catch (error) {
+      providerErrors.push(error.response?.data?.error?.message || error.message);
+    }
+  }
+
+  if (geminiApiKey) {
+    try {
+      const output = await generateWithGemini(prompt, { maxOutputTokens: 800 });
+      const parsed = parseJsonObject(output);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.map((tc) => ({
+          input: String(tc.input ?? ""),
+          expectedOutput: String(tc.expectedOutput ?? ""),
+          reason: String(tc.reason ?? ""),
+        }));
+      }
+      providerErrors.push("Gemini returned non-array test case output");
+    } catch (error) {
+      providerErrors.push(error.response?.data?.error?.message || error.message);
+    }
+  }
+
+  logger.warn("Adversarial test case generation failed; using fallback", {
+    error: providerErrors.join(" | ") || "No available provider",
+  });
+
+  return fallback;
+};
+
 module.exports = {
   formatConversationHistory,
   buildInterviewerPrompt,
   generateInterviewerMessage,
   generateComplexityComparison,
+  generateAdversarialTestCases,
 };

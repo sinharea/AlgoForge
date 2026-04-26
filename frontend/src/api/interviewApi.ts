@@ -122,12 +122,37 @@ export type InterviewStats = {
   }>;
 };
 
+export type AdversarialTestCase = {
+  index: number;
+  input: string;
+  expectedOutput: string;
+  reason: string;
+};
+
+export type AdversarialTestResult = {
+  sessionId: string;
+  testCases: AdversarialTestCase[];
+  executionResults: {
+    verdict: string;
+    passedCount: number;
+    totalCount: number;
+    failedTestCase: number | null;
+    expectedOutput: string | null;
+    actualOutput: string | null;
+    runtime: number;
+    stderr: string | null;
+  } | null;
+  message?: string;
+};
+
 export const interviewApi = {
   start: (payload: { problemId: string }) => api.post<InterviewSessionResponse>("/interview/start", payload),
   respond: (payload: { sessionId: string; userMessage: string }) =>
     api.post<InterviewSessionResponse>("/interview/respond", payload),
   compare: (payload: { sessionId: string; userSolution?: string }) =>
     api.post<InterviewComplexityCompareResponse>("/interview/compare", payload),
+  generateTestCases: (payload: { sessionId: string; userCode: string; language: string }) =>
+    api.post<AdversarialTestResult>("/interview/generate-test-cases", payload),
   end: (payload: { sessionId: string; status?: "completed" | "abandoned" }) =>
     api.post<{ sessionId: string; status: string; duration: number; scoring: InterviewScoring }>("/interview/end", payload),
   saveCode: (payload: { sessionId: string; code: string; language: string }) =>

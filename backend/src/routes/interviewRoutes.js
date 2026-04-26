@@ -10,11 +10,13 @@ const {
   endInterviewSchema,
   saveCodeSnapshotSchema,
   interviewHistoryQuerySchema,
+  generateTestCasesSchema,
 } = require("../validators/interviewValidator");
 const {
   startInterview,
   respondInterview,
   compareInterviewComplexity,
+  generateTestCases,
   getInterviewById,
   getInterviewMessages,
   endInterview,
@@ -30,6 +32,7 @@ router.use(auth);
 router.post("/start", validate(startInterviewSchema), startInterview);
 router.post("/respond", validate(respondInterviewSchema), respondInterview);
 router.post("/compare", validate(compareInterviewComplexitySchema), compareInterviewComplexity);
+router.post("/generate-test-cases", validate(generateTestCasesSchema), generateTestCases);
 router.post("/end", validate(endInterviewSchema), endInterview);
 router.post("/code-snapshot", validate(saveCodeSnapshotSchema), saveCode);
 router.get("/history", validate(interviewHistoryQuerySchema, "query"), getHistory);

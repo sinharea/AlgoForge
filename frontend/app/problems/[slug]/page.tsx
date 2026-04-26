@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import toast from "react-hot-toast";
 import { clsx } from "clsx";
 import { Clock, Tag, Copy, Check, BookOpen, FileCode, TestTube, CheckCircle2, XCircle, AlertTriangle, Loader2, ShieldCheck, Hash, Scale, Lightbulb, GraduationCap, Sparkles, X } from "lucide-react";
-import { problemApi, RunResult } from "@/src/api/problemApi";
+import { problemApi, RunResult, AiSubmissionTestCaseResponse } from "@/src/api/problemApi";
 import { interviewApi, InterviewComplexityComparison } from "@/src/api/interviewApi";
 import CodePlayground from "@/src/features/editor/CodePlayground";
 import { EditorSkeleton } from "@/src/components/ui/Skeleton";
@@ -57,6 +57,7 @@ type SubmissionRecord = {
   code?: string;
   createdAt?: string;
   result?: SubmissionResult;
+  aiAdversarialResult?: AiSubmissionTestCaseResponse & { createdAt?: string };
 };
 
 type DiffRow = {
@@ -118,6 +119,8 @@ export default function ProblemDetailPage() {
   const [latestComplexityComparison, setLatestComplexityComparison] = useState<InterviewComplexityComparison | null>(null);
   const [activeInterviewSessionId, setActiveInterviewSessionId] = useState<string | null>(null);
   const [isComparisonModalOpen, setIsComparisonModalOpen] = useState(false);
+  const [aiSubmissionTestResults, setAiSubmissionTestResults] = useState<AiSubmissionTestCaseResponse | null>(null);
+  const [isAiTestModalOpen, setIsAiTestModalOpen] = useState(false);
   const [revealedHintLevel, setRevealedHintLevel] = useState(0);
   const pageLoadedAt = useRef(Date.now());
 
@@ -219,11 +222,46 @@ export default function ProblemDetailPage() {
       }
       setRunResults([]); // Clear run results when submitting
       toast.success("Submission queued");
+      if (problemQuery.data?._id && String(code || "").trim()) {
+        aiSubmissionTestsMutation.mutate({ submissionId: newSubmissionId });
+      }
       // Refetch submissions list
       submissionsQuery.refetch();
     },
     onError: (error: any) => {
       const errorMsg = error?.response?.data?.error?.message || error?.response?.data?.message || "Submit failed";
+      toast.error(errorMsg);
+    },
+  });
+
+  const aiSubmissionTestsMutation = useMutation({
+    mutationFn: async (params?: { submissionId?: string }) =>
+      (
+        await problemApi.aiTestCases({
+          problemId: problemQuery.data._id,
+          submissionId: params?.submissionId,
+          language,
+          code,
+        })
+      ).data,
+    onSuccess: (data) => {
+      setAiSubmissionTestResults(data);
+      setIsAiTestModalOpen(true);
+
+      const verdict = data.executionResults?.verdict;
+      if (verdict === "Accepted") {
+        toast.success("AI test cases passed.");
+      } else if (verdict) {
+        toast.error(`AI tests found issue: ${verdict}`);
+      } else if (data.message) {
+        toast.error(data.message);
+      }
+    },
+    onError: (error: any) => {
+      const errorMsg =
+        error?.response?.data?.error?.message ||
+        error?.response?.data?.message ||
+        "AI test-case generation failed";
       toast.error(errorMsg);
     },
   });
@@ -460,17 +498,23 @@ export default function ProblemDetailPage() {
   }, [selectedSubmissionId]);
 
   useEffect(() => {
-    if (!isComparisonModalOpen) return;
+    if (!selectedSubmissionQuery.data?.aiAdversarialResult) return;
+    setAiSubmissionTestResults(selectedSubmissionQuery.data.aiAdversarialResult);
+  }, [selectedSubmissionQuery.data?.aiAdversarialResult]);
+
+  useEffect(() => {
+    if (!isComparisonModalOpen && !isAiTestModalOpen) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setIsComparisonModalOpen(false);
+        setIsAiTestModalOpen(false);
       }
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isComparisonModalOpen]);
+  }, [isComparisonModalOpen, isAiTestModalOpen]);
 
   if (problemQuery.isLoading) return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
@@ -1070,6 +1114,29 @@ export default function ProblemDetailPage() {
                                   </pre>
                                 </div>
                               )}
+
+                              {selectedSubmissionQuery.data.aiAdversarialResult ? (
+                                <div className="mt-4 rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] p-3">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <p className="text-xs font-medium uppercase text-[var(--text-muted)]">
+                                      AI Adversarial Test Analysis (Saved)
+                                    </p>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setAiSubmissionTestResults(selectedSubmissionQuery.data.aiAdversarialResult || null);
+                                        setIsAiTestModalOpen(true);
+                                      }}
+                                      className="btn btn-ghost px-3 py-1 text-xs"
+                                    >
+                                      View
+                                    </button>
+                                  </div>
+                                  <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                                    Verdict: {selectedSubmissionQuery.data.aiAdversarialResult.executionResults?.verdict || "N/A"}
+                                  </p>
+                                </div>
+                              ) : null}
                             </>
                           ) : (
                             <p className="text-sm text-[var(--text-muted)]">Unable to load submission details.</p>
@@ -1223,6 +1290,79 @@ export default function ProblemDetailPage() {
                     Continue in Interview Prompt Box
                   </Link>
                 ) : null}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isAiTestModalOpen && aiSubmissionTestResults ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4"
+          onClick={() => setIsAiTestModalOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="AI test case results"
+            className="w-full max-w-3xl overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-[0_30px_60px_rgba(0,0,0,0.45)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-[var(--border-color)] p-5">
+              <div>
+                <h2 className="flex items-center gap-2 text-lg font-semibold text-[var(--text-primary)]">
+                  <TestTube className="h-5 w-5 text-[var(--accent-secondary)]" />
+                  AI Adversarial Test Cases
+                </h2>
+                <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                  Generated test cases designed to break your submitted code.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAiTestModalOpen(false)}
+                className="btn btn-ghost h-9 w-9 rounded-full p-0"
+                aria-label="Close AI test modal"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="max-h-[78vh] space-y-4 overflow-y-auto p-5">
+              {aiSubmissionTestResults.executionResults ? (
+                <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-3 text-sm">
+                  <p>
+                    Verdict: <span className="font-semibold">{aiSubmissionTestResults.executionResults.verdict}</span>
+                  </p>
+                  <p>
+                    Passed: {aiSubmissionTestResults.executionResults.passedCount}/
+                    {aiSubmissionTestResults.executionResults.totalCount}
+                  </p>
+                  {aiSubmissionTestResults.executionResults.failedTestCase ? (
+                    <p>Failed at AI test case #{aiSubmissionTestResults.executionResults.failedTestCase}</p>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {aiSubmissionTestResults.message ? (
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
+                  {aiSubmissionTestResults.message}
+                </div>
+              ) : null}
+
+              <div className="space-y-3">
+                {aiSubmissionTestResults.testCases.map((tc) => (
+                  <div key={tc.index} className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] p-3">
+                    <p className="text-sm font-semibold">Test #{tc.index}</p>
+                    <p className="mt-2 text-xs uppercase text-[var(--text-muted)]">Input</p>
+                    <pre className="overflow-auto rounded-md bg-[var(--bg-secondary)] p-2 text-xs">{tc.input || "(empty)"}</pre>
+                    <p className="mt-2 text-xs uppercase text-[var(--text-muted)]">Expected Output</p>
+                    <pre className="overflow-auto rounded-md bg-[var(--bg-secondary)] p-2 text-xs">{tc.expectedOutput || "(empty)"}</pre>
+                    {tc.reason ? (
+                      <p className="mt-2 text-xs text-[var(--text-secondary)]">Reason: {tc.reason}</p>
+                    ) : null}
+                  </div>
+                ))}
               </div>
             </div>
           </div>

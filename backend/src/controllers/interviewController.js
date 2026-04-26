@@ -3,6 +3,7 @@ const {
   startInterviewSession,
   respondInterviewSession,
   compareInterviewSessionComplexity,
+  generateAndRunAdversarialTests,
   getInterviewSession,
   getInterviewSessionMessages,
   endInterviewSession,
@@ -100,10 +101,21 @@ const getStats = asyncHandler(async (req, res) => {
   res.json(data);
 });
 
+const generateTestCases = asyncHandler(async (req, res) => {
+  const data = await generateAndRunAdversarialTests({
+    userId: req.user._id,
+    sessionId: req.body.sessionId,
+    userCode: req.body.userCode,
+    language: req.body.language,
+  });
+  res.json(data);
+});
+
 module.exports = {
   startInterview,
   respondInterview,
   compareInterviewComplexity,
+  generateTestCases,
   getInterviewById,
   getInterviewMessages,
   endInterview,

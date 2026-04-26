@@ -44,6 +44,12 @@ const interviewHistoryQuerySchema = z.object({
   difficulty: z.enum(["Easy", "Medium", "Hard", "all"]).default("all"),
 });
 
+const generateTestCasesSchema = z.object({
+  sessionId: objectId,
+  userCode: z.string().trim().min(1).max(10000),
+  language: z.enum(["cpp", "python", "javascript", "java", "go", "rust", "typescript"]),
+});
+
 module.exports = {
   startInterviewSchema,
   respondInterviewSchema,
@@ -53,4 +59,5 @@ module.exports = {
   endInterviewSchema,
   saveCodeSnapshotSchema,
   interviewHistoryQuerySchema,
+  generateTestCasesSchema,
 };

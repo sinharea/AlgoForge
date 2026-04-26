@@ -4,10 +4,16 @@ const router = express.Router();
 const auth = require("../middleware/auth");
 const validate = require("../middleware/validate");
 const { submissionLimiter, runLimiter } = require("../middleware/rateLimiter");
-const { createSubmissionSchema, runCodeSchema, submissionIdParamsSchema } = require("../validators/submissionValidator");
+const {
+  createSubmissionSchema,
+  runCodeSchema,
+  aiSubmissionTestCaseSchema,
+  submissionIdParamsSchema,
+} = require("../validators/submissionValidator");
 
 const {
   createSubmission,
+  generateAiSubmissionTestCases,
   getSubmissionById,
   getSubmissionReview,
   getMySubmissions,
@@ -25,6 +31,9 @@ router.post("/", submissionLimiter, validate(createSubmissionSchema), createSubm
 
 // Run code (without submitting) - more lenient rate limit
 router.post("/run", runLimiter, validate(runCodeSchema), runCode);
+
+// Generate AI adversarial tests and run code against them
+router.post("/ai-test-cases", runLimiter, validate(aiSubmissionTestCaseSchema), generateAiSubmissionTestCases);
 
 // Get AI review for a specific submission
 router.get("/:id/review", validate(submissionIdParamsSchema, "params"), getSubmissionReview);

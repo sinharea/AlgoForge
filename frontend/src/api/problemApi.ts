@@ -38,6 +38,30 @@ export interface SimilarProblem {
   tags: string[];
 }
 
+export interface AiSubmissionTestCase {
+  index: number;
+  input: string;
+  expectedOutput: string;
+  reason?: string;
+}
+
+export interface AiSubmissionExecutionResults {
+  verdict: string;
+  passedCount: number;
+  totalCount: number;
+  failedTestCase: number | null;
+  expectedOutput: string | null;
+  actualOutput: string | null;
+  runtime: number;
+  stderr: string | null;
+}
+
+export interface AiSubmissionTestCaseResponse {
+  testCases: AiSubmissionTestCase[];
+  executionResults: AiSubmissionExecutionResults | null;
+  message?: string;
+}
+
 export const problemApi = {
   list: (params: Record<string, unknown>) => api.get("/problems", { params }),
   getById: (id: string) => api.get(`/problems/${id}`),
@@ -50,6 +74,8 @@ export const problemApi = {
     api.get<{ similar: SimilarProblem[] }>(`/problems/slug/${slug}/similar`),
   submit: (payload: { problemId: string; language: string; code: string; contestId?: string; timeTaken?: number }) =>
     api.post("/submissions", payload),
+  aiTestCases: (payload: { problemId: string; submissionId?: string; language: string; code: string }) =>
+    api.post<AiSubmissionTestCaseResponse>("/submissions/ai-test-cases", payload),
   run: (payload: { language: string; code: string; testCases: TestCase[] }) =>
     api.post<{ results: RunResult[] }>("/submissions/run", payload),
   submission: (id: string) => api.get(`/submissions/${id}`),

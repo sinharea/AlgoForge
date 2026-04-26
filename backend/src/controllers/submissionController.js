@@ -9,6 +9,7 @@ const { ensureContestSubmissionAllowed, trackContestSubmission } = require("../s
 const { judgeSubmission, execute, normalize, truncateOutput } = require("../services/executionService");
 const { runPostSubmissionPipeline } = require("../services/analyticsService");
 const { generateCodeReview } = require("../services/codeReviewService");
+const { generateAdversarialTestCases } = require("../services/interviewLlmService");
 const logger = require("../utils/logger");
 
 // Duplicate submission prevention: track recent submissions per user
@@ -363,8 +364,86 @@ const runCode = asyncHandler(async (req, res) => {
   res.json({ results });
 });
 
+const generateAiSubmissionTestCases = asyncHandler(async (req, res) => {
+  const { problemId, submissionId, language, code } = req.body;
+
+  const problem = await Problem.findById(problemId).select(
+    "title difficulty tags description constraints timeLimit memoryLimit"
+  );
+  if (!problem) throw new ApiError(404, "Problem not found");
+
+  const problemStatement = [
+    `Title: ${problem.title}`,
+    `Difficulty: ${problem.difficulty || "Unknown"}`,
+    `Tags: ${(problem.tags || []).join(", ") || "None"}`,
+    "Description:",
+    String(problem.description || ""),
+    "Constraints:",
+    String(problem.constraints || "No constraints provided."),
+  ].join("\n");
+
+  const generated = await generateAdversarialTestCases({
+    problemStatement,
+    userCode: code,
+    language,
+  });
+
+  const validTests = (Array.isArray(generated) ? generated : []).filter(
+    (tc) => typeof tc?.input === "string" && typeof tc?.expectedOutput === "string"
+  );
+
+  if (validTests.length === 0) {
+    return res.json({
+      testCases: [],
+      executionResults: null,
+      message: "AI test cases could not be generated right now.",
+    });
+  }
+
+  const judged = await judgeSubmission({
+    language,
+    code,
+    testCases: validTests,
+    timeLimit: problem.timeLimit || 3000,
+    memoryLimit: problem.memoryLimit || 256,
+  });
+
+  const payload = {
+    testCases: validTests.map((tc, idx) => ({
+      index: idx + 1,
+      input: tc.input,
+      expectedOutput: tc.expectedOutput,
+      reason: String(tc.reason || ""),
+    })),
+    executionResults: {
+      verdict: judged.verdict,
+      passedCount: judged.passedCount,
+      totalCount: judged.totalCount,
+      failedTestCase: judged.failedTestCase || null,
+      expectedOutput: judged.expectedOutput || null,
+      actualOutput: judged.actualOutput || null,
+      runtime: judged.runtime,
+      stderr: judged.stderr || null,
+    },
+  };
+
+  if (submissionId) {
+    const submission = await Submission.findById(submissionId);
+    if (submission && String(submission.user) === String(req.user._id)) {
+      submission.aiAdversarialResult = {
+        ...payload,
+        createdAt: new Date(),
+      };
+      await submission.save();
+    }
+  }
+
+  return res.json(payload);
+});
+
 module.exports = {
   createSubmission,
+  generateAiSubmissionTestCases,
   getSubmissionById,
   getSubmissionReview,
   getMySubmissions,

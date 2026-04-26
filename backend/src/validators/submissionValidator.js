@@ -22,6 +22,13 @@ const runCodeSchema = z.object({
   ).min(1).max(10),
 });
 
+const aiSubmissionTestCaseSchema = z.object({
+  problemId: z.string().regex(/^[a-fA-F0-9]{24}$/, "Invalid problem id"),
+  submissionId: z.string().regex(/^[a-fA-F0-9]{24}$/, "Invalid submission id").optional(),
+  language: z.enum(SUPPORTED_LANGUAGES),
+  code: z.string().min(1).max(MAX_CODE_SIZE, "Code exceeds maximum size of 64KB"),
+});
+
 const submissionIdParamsSchema = z.object({
   id: z.string().regex(/^[a-fA-F0-9]{24}$/, "Invalid submission id"),
 });
@@ -29,6 +36,7 @@ const submissionIdParamsSchema = z.object({
 module.exports = {
   createSubmissionSchema,
   runCodeSchema,
+  aiSubmissionTestCaseSchema,
   submissionIdParamsSchema,
   supportedLanguages: SUPPORTED_LANGUAGES,
   MAX_CODE_SIZE,
